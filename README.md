@@ -26,7 +26,7 @@ Music Player Daemon Current playing info
 ## usage
 ----------------
     
-cover will check for local before if it run on local than will be valid, for remote server mpd use must run `cover server' (`-s`) with `-S, -P and -p`
+cover will check for local before if it run on local than will be valid, for remote server mpd use must run `cover server` (`-s`) with `-S, -P and -p`
     
 ```bash
     usage: mpdart [-h] [-s] [-S COVER_SERVER_HOST] [-P COVER_SERVER_PORT] [-p MUSIC_DIR] [--mpd-host MPD_HOST] [--mpd-port MPD_PORT]
