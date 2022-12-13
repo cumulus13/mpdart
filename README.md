@@ -1,7 +1,7 @@
 # MPD-Art
 --------------------
     
-    Music Player Daemon Current playing info
+Music Player Daemon Current playing info
     
 
 ![screenshot](https://github.com/cumulus13/mpdart/blob/8dfe1e539cd5c7bd9cfe9e501c965456be8343a8/screenshot.png "Screenshot Example")
@@ -58,7 +58,7 @@ cover will check for local before if it run on local than will be valid, for rem
     python mpdart.py -p /mnt/musics
 ```
 
-    use can use config file `mpdart.ini` to direct setup some options
+    you can use config file `mpdart.ini` to direct setup some options
     
 ## author
 ---------
