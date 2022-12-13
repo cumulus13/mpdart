@@ -3,7 +3,7 @@
     
     Music Player Daemon Current playing info
     
-    ![screeshoot](screenshot.png "Screenshot Example")
+    ![screeshoot](https://github.com/cumulus13/mpdart/blob/8dfe1e539cd5c7bd9cfe9e501c965456be8343a8/screenshot.png "Screenshot Example")
     
 ## requirement
 -------------------
