@@ -1,0 +1,46 @@
+[mpd]
+host = 
+port = 
+dir = 
+timeout = 60
+music_dir = 
+
+[config]
+file = 
+
+[sleep]
+time = 1000
+
+[icon]
+path = 
+
+[cover]
+valid = 
+
+[GENERAL]
+events = 
+
+[lastfm]
+api = c725344c28768a57a507f014bdxxxxxx
+shared = d4c032479a1de021793b5f4d21xxxxxx
+
+[cover_server]
+host = 192.168.0.2
+port = 8811
+
+[notification]
+xnotify = 1
+
+[xnotify]
+growl = 
+grow_host = 
+nmd = 
+nmd_api = 
+pushbullet = 
+pushbullet_api = 
+ntfy = 
+ntfy_server = 
+
+[playback]
+seek = 10
+
