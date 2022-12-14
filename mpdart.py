@@ -828,6 +828,8 @@ class MPDArt(QDialog):
             global MPD_MUSIC_DIR
             global MPD_SLEEP        
             args = parser.parse_args()
+            self.host = args.mpd_host or os.getenv('MPD_HOST') or self.host
+            self.port = args.mpd_port or os.getenv('MPD_PORT') or self.port
             debug(args_music_dir = args.music_dir)
 
             MPD_HOST = args.cover_server_host
