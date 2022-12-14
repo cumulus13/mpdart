@@ -8,7 +8,7 @@ Music Player Daemon Current playing info
 
 ![screenshot 2](https://github.com/cumulus13/mpdart/blob/24e2c23b28960c02a70b2672f188317b2d6ba669/screenshot1.png "Screenshot Example 2")
 
-![screenshot 3](https://github.com/cumulus13/mpdart/blob/24e2c23b28960c02a70b2672f188317b2d6ba669/screenshot2.png "Screenshot Example 3")
+![screenshot 3](https://github.com/cumulus13/mpdart/blob/6d8804c780d361e1a5277a2a4394eea38391309b/screenshot2.jpg "Screenshot Example 3")
     
 ## requirements
 -------------------
