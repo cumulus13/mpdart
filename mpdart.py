@@ -106,7 +106,7 @@ class MPDArt(QDialog):
     COVER_TEMP_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'covers')
     FAIL_LAST_FM = False
     current_state = {}
-    first = False
+    #first = False
 
     def __init__(self, host = None, port = None, sleep = None, configfile = None, icon = None, music_dir = None):
         
@@ -570,6 +570,8 @@ class MPDArt(QDialog):
         label = ''
         bitrate = ''
         genres = ''
+        current_song = {}
+        current_state = {}
         
         #c = self.conn(host, port)
         #current_state = self.conn(host, port).status()
@@ -645,37 +647,43 @@ class MPDArt(QDialog):
                 bitrate + " - " + \
                 label 
             )
+        if current_song:
             self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "jpg")
-            if not os.path.isfile(self.cover):
-                self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "png")
-            if not os.path.isfile(self.cover):
-                self.cover = self.get_cover(current_song.get('file'), current_song, self.music_dir)
-            debug(self_cover = self.cover)
-            if self.cover:
-                if os.path.isfile(self.cover):
-                    self.setWindowIcon(QIcon(self.cover))
-                    self.setPixmap(self.cover)
+        if not os.path.isfile(self.cover):
+            self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "png")
+        if not os.path.isfile(self.cover):
+            self.cover = self.get_cover(current_song.get('file'), current_song, self.music_dir)
+        debug(self_cover = self.cover)
+        
+        if self.check_is_image(self.cover):
+            self.setWindowIcon(QIcon(self.cover))
+            self.setPixmap(self.cover)
+
         debug(current_song = current_song)
         debug(self_current_song = self.current_song)
         debug(current_state = current_state)
         debug(self_current_state = self.current_state)
-        msg = ''
-        if not self.current_song.get('file') == current_song.get('file') and title:
-            msg = track + "/" +\
-                disc  + ". " +\
-                title + " (" +\
-                duration + ")" +\
-                "\n" +\
-                artist + "\n" +\
-                album + "\n" +\
-                genres + "\n" + \
-                current_state.get('state')
+        msg = track + "/" +\
+            disc  + ". " +\
+            title + " (" +\
+            duration + ")" +\
+            "\n" +\
+            artist + "\n" +\
+            album + "\n" +\
+            genres + "\n" + \
+            current_state.get('state')
+        if not self.current_song.get('file') == current_song.get('file') and title:            
             self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
             print("send info current song")
-            self.first = True
+            #self.first = True
+            #self.bring_to_front(self)
+            try:
+                self.bring_to_front(self.dark_view)
+            except:
+                self.bring_to_front(self)
         self.current_song = current_song
         
-        if not self.current_state.get('state') == current_state.get('state') and not self.first:
+        if not self.current_state.get('state') == current_state.get('state'):# and not self.first:
             self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
             print("send info current state")
         self.current_state = current_state
