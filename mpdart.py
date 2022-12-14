@@ -114,11 +114,15 @@ class MPDArt(QDialog):
             super().__init__()
         else:
             super(MPDArt(), self).__init__()
-        QDialog.__init__(self, None, QtCore.Qt.WindowStaysOnTopHint)
+        #QDialog.__init__(self, None, QtCore.Qt.WindowStaysOnTopHint)
+        
+        self.ui = Ui_mpdart()
+        self.ui.setupUi(self)        
+        self.setShortcut()
+        self.installEventFilter(self)
+        
         self.music_dir = music_dir or self.music_dir or self.CONFIG.get_config('mpd', 'music_dir')
         debug(music_dir = music_dir)
-        
-        self.installEventFilter(self)
         
         if not self.music_dir:
             print(make_colors("No Music Directory 'music_dir' setup !", 'lw', 'r'))
@@ -140,11 +144,7 @@ class MPDArt(QDialog):
         if self.configfile:
             if os.path.isfile(self.configfile): self.CONFIG = configset(self.configfile)
 
-        self.ui = Ui_mpdart()
-        self.ui.setupUi(self)        
-        self.setShortcut()
-        self.installEventFilter(self)
-
+        
         self.icon = icon or self.CONFIG.get_config('icon', 'path')
         if not os.path.isfile(self.icon): self.icon = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icon.png')
         debug(self_icon = self.icon)
@@ -693,6 +693,12 @@ class MPDArt(QDialog):
 
         self.quit_shortcut = QShortcut(QKeySequence("q"), self)
         self.quit_shortcut.activated.connect(self.close)
+        
+        self.next_shortcut = QShortcut(QKeySequence("n"), self)
+        self.next_shortcut.activated.connect(self.play_next)
+        
+        self.next_shortcut = QShortcut(QKeySequence("p"), self)
+        self.next_shortcut.activated.connect(self.play_prev)        
 
     def eventFilter(self, obj, event):
         # if (event.type() == QtCore.QEvent.Resize):
@@ -741,6 +747,10 @@ class MPDArt(QDialog):
         self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time')) + float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
     def seek_prev(self):
         self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time')) - float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
+    def play_next(self):
+        self.conn('next')
+    def play_prev(self):
+        self.conn('previous')
     def get_dev_ip(self, suggest = None):
         data = []
         for ifaceName in interfaces():
