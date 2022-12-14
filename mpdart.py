@@ -297,15 +297,15 @@ class MPDArt(QDialog):
                 except:
                     pass
 
-        if not os.path.isfile(music_file):
-            if not self.first:
-                print(make_colors("Invalid Music file !", 'lw', 'lr'))
-            if not sys.platform == 'win32':
-                pnotify = pynotify.Notification("Error", "Invalid Music file !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
-                pnotify.show()
-            if not self.first:
-                notify.send("Error", "Invalid Music file !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
-            return ''
+        #if not os.path.isfile(music_file):
+            #if not self.first:
+                #print(make_colors("Invalid Music file !", 'lw', 'lr'))
+            #if not sys.platform == 'win32':
+                #pnotify = pynotify.Notification("Error", "Invalid Music file !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
+                #pnotify.show()
+            #if not self.first:
+                #notify.send("Error", "Invalid Music file !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
+            #return ''
         data_cover = None
         debug(music_file = music_file)
         if music_file.lower().endswith('.mp3'):
@@ -516,7 +516,10 @@ class MPDArt(QDialog):
             if self.current_song.get('file') == file and (not self.cover or not self.check_is_image(self.cover)):
                 cover_file = os.path.join(music_dir, "\\".join(file.split("/")[1:]))
                 debug(cover_file = cover_file)
-                self.cover = self.get_cover_tag(cover_file)
+                try:
+                    self.cover = self.get_cover_tag(cover_file)
+                except:
+                    pass
             if self.check_is_image(self.cover):
                 #print('return 2.....')
                 return self.cover
