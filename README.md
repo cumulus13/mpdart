@@ -6,7 +6,7 @@ Music Player Daemon Current playing info
 
 ![screenshot](https://github.com/cumulus13/mpdart/blob/8dfe1e539cd5c7bd9cfe9e501c965456be8343a8/screenshot.png "Screenshot Example")
     
-## requirement
+## requirements
 -------------------
     - netifaces
     - Pillow
@@ -28,7 +28,7 @@ Music Player Daemon Current playing info
 ## usage
 ----------------
     
-cover: will check image file for local/remote before if it run on local then check tag if not exist then if not valid it will get cover from cover server or last.fm (api key requirement). (`optional`) run mpd as `cover server` (`-s`) with `-S, -P and -p` options on where mpd server running before if you want get cover from cover server.
+cover: will check image file for local/remote before if run on local then will check tag, if not exist or cover not valid then will get cover from cover server or last.fm (api key requirement). (`optional`) run mpd as `cover server` (`-s`) with `-S, -P and -p` options on where mpd server running before if you want get cover from cover server.
     
 ```bash
     usage: mpdart [-h] [-s] [-S COVER_SERVER_HOST] [-P COVER_SERVER_PORT] [-p MUSIC_DIR] [--mpd-host MPD_HOST] [--mpd-port MPD_PORT]
