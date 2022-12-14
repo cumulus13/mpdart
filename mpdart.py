@@ -15,6 +15,8 @@ from pydebugger.debug import debug
 import re
 import socket
 import os
+import io
+from PIL import Image
 import sys
 import signal
 import time
@@ -75,13 +77,16 @@ MPD_SLEEP = 1
 class MPDArt(QDialog):
     keyPressed = pyqtSignal(str)
     CONFIG = configset()
-    host = CONFIG.get_config('mpd', 'host') or '127.0.0.1'
-    port = CONFIG.get_config('mpd', 'port') or 6600
+    host = CONFIG.get_config('mpd', 'host') or os.getenv('MPD_HOST') or '127.0.0.1'
+    port = CONFIG.get_config('mpd', 'port') or os.getenv('MPD_PORT') or 6600
     configfile = CONFIG.get_config('config', 'file')
     sleep = CONFIG.get_config('sleep', 'time') or 1000
     icon = CONFIG.get_config('icon', 'path')
     music_dir = CONFIG.get_config('mpd', 'dir')
+    timeout = CONFIG.get_config('mpd', 'timeout')
     CONN = MPDClient()
+    debug(host = host)
+    debug(port = port)
     CONN.connect(host, port)
     first_current_song = False
     first_state = False
@@ -106,7 +111,7 @@ class MPDArt(QDialog):
             print(make_colors("No Music Directory 'music_dir' setup !", 'lw', 'r'))
             #return False
         if self.music_dir:
-            if not os.path.isdir(self.music_dir):
+            if not os.path.isdir(self.music_dir) and self.music_dir[1:3] == ":\\":
                 print(make_colors("Invalid Music Directory 'music_dir'!, please setup before", 'lw', 'r'))
                 #return False
         host0 = host
@@ -170,9 +175,14 @@ class MPDArt(QDialog):
         window.activateWindow()
     
     def conn(self, func, args = (), host = None, port = None, refresh = False, repeat = False):
-        host = host or self.host or '127.0.0.1'
-        port = port or self.port or 6600
-        timeout = self.CONFIG.get_config('mpd', 'timeout') or None
+        if host and not host == self.host or port and not port == self.port:
+            self.CONN.connect(host, port, self.timeout)
+            self.host = host
+            self.port = port
+        else:
+            host = host or self.host or '127.0.0.1'
+            port = port or self.port or 6600
+        timeout = self.timeout or self.CONFIG.get_config('mpd', 'timeout') or None
         debug(host = host)
         debug(port = port)
         debug(timeout = timeout)
@@ -411,7 +421,23 @@ class MPDArt(QDialog):
             if not os.path.isfile(file_path): file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'no-cover.png')
         return file_path, img_url, thumb
 
-    def get_cover(self, file, music_dir = None, get_lastfm_cover = True, refresh = False):
+    def get_cover(self, file, current_song, music_dir = None, get_lastfm_cover = True, refresh = False):
+        img_data = self.conn('albumart', (file, ))
+        if img_data:
+            img_data = img_data.get('binary')
+        debug(img_data = len(img_data))
+        
+        if img_data and current_song:
+            img = Image.open(io.BytesIO(img_data))
+            debug(check_ext = mimelist.get2(img.format))
+            ext = mimelist.get2(img.format)[1]
+            if not os.path.isdir(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'))):
+                os.makedirs(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album')))
+            img.save(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext))
+        if os.path.isfile(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)):
+            self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
+            return os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
+        
         if refresh:
             self.cover = ''
         debug(self_cover = self.cover)
@@ -527,29 +553,29 @@ class MPDArt(QDialog):
             if not label: label = ''
 
         if current_state.get('state') == 'play' or current_state.get('state') == 'pause':
-            #value = int((float(current_state.get('elapsed')) / float(current_state.get('duration'))) * 100)
-            #value = int("%0.0f" % (float(current_state.get('elapsed')))) / int("%0.0f" % (float(current_state.get('duration'))))
-            #debug(value = value, debug = 1)
             self.ui.pbar.setValue(int((float(current_state.get('elapsed')) / float(current_state.get('duration'))) * 100))
 
             self.ui.bitrate.setText(
                 current_state.get('bitrate') + " - " + \
                 label 
             )
-            self.cover = self.get_cover(current_song.get('file'), self.music_dir)
+            self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "jpg")
+            if not os.path.isfile(self.cover):
+                self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "png")
+            if not os.path.isfile(self.cover):
+                self.cover = self.get_cover(current_song.get('file'), current_song, self.music_dir)
             debug(self_cover = self.cover)
             if self.cover:
                 if os.path.isfile(self.cover):
                     self.setWindowIcon(QIcon(self.cover))
                     self.setPixmap(self.cover)
 
-    #@classmethod
-    #def setShortcut(self):
-        #self.quit_shortcut = QShortcut(QKeySequence("esc"), self)
-        #self.quit_shortcut.activated.connect(self.close)
+    def setShortcut(self):
+        self.quit_shortcut = QShortcut(QKeySequence("esc"), self)
+        self.quit_shortcut.activated.connect(self.close)
 
-        #self.quit_shortcut = QShortcut(QKeySequence("q"), self)
-        #self.quit_shortcut.activated.connect(self.close)
+        self.quit_shortcut = QShortcut(QKeySequence("q"), self)
+        self.quit_shortcut.activated.connect(self.close)
     
     def get_dev_ip(self, suggest = None):
         data = []

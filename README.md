@@ -26,7 +26,7 @@ Music Player Daemon Current playing info
 ## usage
 ----------------
     
-cover: will check image file for local before if it run on local then check tag if not exist if not valid than if will get cover from cover server or last.fm (api key requirement). for remote server good to run mpd as `cover server` (`-s`) too with `-S, -P and -p` option
+cover: will check image file for local/remote before if it run on local then check tag if not exist then if not valid it will get cover from cover server or last.fm (api key requirement). (`optional`) run mpd as `cover server` (`-s`) with `-S, -P and -p` options on where mpd server running before if you want get cover from cover server.
     
 ```bash
     usage: mpdart [-h] [-s] [-S COVER_SERVER_HOST] [-P COVER_SERVER_PORT] [-p MUSIC_DIR] [--mpd-host MPD_HOST] [--mpd-port MPD_PORT]
