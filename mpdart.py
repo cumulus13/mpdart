@@ -82,6 +82,8 @@ MPD_PORT = 6600
 MPD_MUSIC_DIR = '' 
 MPD_SLEEP = 1
 
+MOD_MASK = (Qt.CTRL | Qt.ALT | Qt.SHIFT | Qt.META)
+
 class MPDArt(QDialog):
     keyPressed = pyqtSignal(str)
     CONFIG = configset()
@@ -120,6 +122,10 @@ class MPDArt(QDialog):
         self.ui.setupUi(self)        
         self.setShortcut()
         self.installEventFilter(self)
+        try:
+            self.installEventFilter(self.dark_view)
+        except:
+            pass
         
         self.music_dir = music_dir or self.music_dir or self.CONFIG.get_config('mpd', 'music_dir')
         debug(music_dir = music_dir)
@@ -748,13 +754,16 @@ class MPDArt(QDialog):
             self.seek_prev()
         elif keyname == 'Right':
             self.seek_next()
-
+        elif keyname == 'N':
+            self.play_next()
+        elif keyname == 'P':
+            self.play_prev()
         self.keyPressed.emit(keyname)
     
     def seek_next(self):
-        self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time')) + float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
+        self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time').split(":")[0]) + float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
     def seek_prev(self):
-        self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time')) - float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
+        self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time').split(":")[0]) - float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
     def play_next(self):
         self.conn('next')
     def play_prev(self):
@@ -842,6 +851,10 @@ class MPDArt(QDialog):
                     qtmodern.styles.dark(app)
                     #app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
                     self.dark_view = qtmodern.windows.ModernWindow(self)
+                    try:
+                        self.installEventFilter(self.dark_view)
+                    except:
+                        pass                    
                     #self.dark_view.setWindowTitle()
                     self.dark_view.show()
                     self.show()
