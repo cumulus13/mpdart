@@ -108,7 +108,7 @@ class MPDArt(QDialog):
     COVER_TEMP_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'covers')
     FAIL_LAST_FM = False
     current_state = {}
-    #first = False
+    first = False
 
     def __init__(self, host = None, port = None, sleep = None, configfile = None, icon = None, music_dir = None):
         
@@ -256,7 +256,8 @@ class MPDArt(QDialog):
             self.command = func
             return getattr(self.CONN, func)(*args)
         except:
-            print(traceback.format_exc())
+            if not self.first:
+                print(traceback.format_exc())
             try:
                 c = MPDClient()
                 c.connect(host, port, timeout)
@@ -268,7 +269,10 @@ class MPDArt(QDialog):
                 self.command = func
                 return getattr(c, func)(*args)                
             except:
-                print(traceback.format_exc())
+                if not self.first:
+                    print(traceback.format_exc())
+                    self.first = True
+            #self.first = True
         self.command = func
         return {}
 
@@ -294,11 +298,13 @@ class MPDArt(QDialog):
                     pass
 
         if not os.path.isfile(music_file):
-            print(make_colors("Invalid Music file !", 'lw', 'lr'))
+            if not self.first:
+                print(make_colors("Invalid Music file !", 'lw', 'lr'))
             if not sys.platform == 'win32':
                 pnotify = pynotify.Notification("Error", "Invalid Music file !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
                 pnotify.show()
-            notify.send("Error", "Invalid Music file !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
+            if not self.first:
+                notify.send("Error", "Invalid Music file !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
             return ''
         data_cover = None
         debug(music_file = music_file)
@@ -316,11 +322,14 @@ class MPDArt(QDialog):
             if f.picture:
                 data_cover = f.picture[0]
         if not data_cover:
-            print(make_colors("Music file don't containt tag Cover !", 'lw', 'r'))
+            if not self.first:
+                print(make_colors("Music file don't containt tag Cover !", 'lw', 'r'))
             if not sys.platform == 'win32':
-                pnotify = pynotify.Notification("Error", "Music file don't containt tag Cover !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
+                if not self.first:
+                    pnotify = pynotify.Notification("Error", "Music file don't containt tag Cover !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
                 pnotify.show()
-            notify.send("Error", "Music file don't containt tag Cover !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
+            if not self.first:
+                notify.send("Error", "Music file don't containt tag Cover !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
             # return self.DEFAULT_COVER
             return ''
 
@@ -337,11 +346,14 @@ class MPDArt(QDialog):
             with open(os.path.join(save_dir, 'cover2.' + ext), 'w') as c:
                 c.write(data_cover.data)
         if not os.path.isfile(os.path.join(save_dir, 'cover2.' + ext)):
-            print(make_colors("Invalid Cover !", 'lw', 'r'))
+            if not self.first:
+                print(make_colors("Invalid Cover !", 'lw', 'r'))
             if not sys.platform == 'win32':
-                pnotify = pynotify.Notification("Error", "Invalid Cover !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
+                if not self.first:
+                    pnotify = pynotify.Notification("Error", "Invalid Cover !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
                 pnotify.show()
-            notify.send("Error", "Invalid Cover !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
+            if not self.first:
+                notify.send("Error", "Invalid Cover !", "MPDNotify", "error", iconpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"), sticky = True)
             return self.DEFAULT_COVER
 
         return os.path.join(save_dir, 'cover2.' + ext)
@@ -473,6 +485,7 @@ class MPDArt(QDialog):
 
     def get_cover(self, file, current_song, music_dir = None, get_lastfm_cover = True, refresh = False):
         img_data = self.conn('albumart', (file, ))
+        ext = 'jpg'
         if img_data:
             img_data = img_data.get('binary')
         debug(img_data = len(img_data))
@@ -537,7 +550,10 @@ class MPDArt(QDialog):
                     chost = self.CONFIG.get_config('cover_server', 'host')
                     if chost == '0.0.0.0':
                         chost = '127.0.0.1'
-                    fc.write(requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port'))).content)
+                    try:
+                        fc.write(requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port'))).content)
+                    except:
+                        pass
                 if self.check_is_image(os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')):
                     return os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')
             except:
@@ -689,7 +705,7 @@ class MPDArt(QDialog):
                 self.bring_to_front(self)
         self.current_song = current_song
         
-        if not self.current_state.get('state') == current_state.get('state'):# and not self.first:
+        if not self.current_state.get('state') == current_state.get('state') and not self.first:
             self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
             print("send info current state")
         self.current_state = current_state
@@ -700,7 +716,8 @@ class MPDArt(QDialog):
         debug(self_current_state = self.current_state)
         #print("-" *125)
         #sys.exit()
-
+        self.first = True
+        
     def setShortcut(self):
         self.quit_shortcut = QShortcut(QKeySequence("esc"), self)
         self.quit_shortcut.activated.connect(self.close)
