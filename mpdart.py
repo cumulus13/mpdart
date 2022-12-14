@@ -702,7 +702,8 @@ class MPDArt(QDialog):
             try:
                 self.bring_to_front(self.dark_view)
             except:
-                self.bring_to_front(self)
+                #self.bring_to_front(self)
+                pass
         self.current_song = current_song
         
         if not self.current_state.get('state') == current_state.get('state') and not self.first:
@@ -870,6 +871,10 @@ class MPDArt(QDialog):
                     qtmodern.styles.dark(app)
                     #app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
                     self.dark_view = qtmodern.windows.ModernWindow(self)
+                    self.dark_view.setMaximumSize(self.maximumSize())
+                    self.dark_view.setMaximumHeight(self.maximumHeight())
+                    self.dark_view.setMaximumWidth(self.maximumWidth())
+                    self.dark_view.setFixedSize(self.maximumWidth() + 10, self.maximumHeight() + 40)
                     try:
                         self.installEventFilter(self.dark_view)
                     except:
