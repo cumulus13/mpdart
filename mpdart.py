@@ -13,14 +13,14 @@ logger.setLevel(logging.DEBUG)
 from make_colors import make_colors
 from pydebugger.debug import debug
 import re
-import socket
+#import socket
 import os
 import io
 from PIL import Image
 import sys
 import signal
 import time
-import base64
+#import base64
 import http.server as SimpleHTTPServer
 import socketserver as SocketServer
 from mutagen.id3 import ID3
@@ -40,11 +40,15 @@ try:
 except:
     def pause(*args, **kwargs):
         return None
+NOTIFY2 = False
 if not sys.platform == 'win32':
-    import notify2 as pynotify
-
-    if not pynotify.init("MPD status"):
-        print("warning: Unable to initialize dbus Notifications")
+    try:
+        import notify2 as pynotify
+        NOTIFY2 = True
+        if not pynotify.init("MPD status"):
+            print("warning: Unable to initialize dbus Notifications")
+    except:
+        NOTIFY2 = False
 
 from PyQt5 import Qt
 from PyQt5.Qt import QStandardItemModel, QStandardItem, QKeySequence
@@ -63,7 +67,11 @@ import ast, json
 from configset import configset
 from mpd import MPDClient
 import mpd
-from xnotify import notify
+try:
+    from xnotify import notify
+    XNOTIFY = True
+except:
+    XNOTIFY = False
 try:
     from . import mimelist
 except:
@@ -97,6 +105,8 @@ class MPDArt(QDialog):
     current_song = {}
     COVER_TEMP_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'covers')
     FAIL_LAST_FM = False
+    current_state = {}
+    first = False
 
     def __init__(self, host = None, port = None, sleep = None, configfile = None, icon = None, music_dir = None):
         
@@ -107,6 +117,9 @@ class MPDArt(QDialog):
         QDialog.__init__(self, None, QtCore.Qt.WindowStaysOnTopHint)
         self.music_dir = music_dir or self.music_dir or self.CONFIG.get_config('mpd', 'music_dir')
         debug(music_dir = music_dir)
+        
+        self.installEventFilter(self)
+        
         if not self.music_dir:
             print(make_colors("No Music Directory 'music_dir' setup !", 'lw', 'r'))
             #return False
@@ -129,7 +142,7 @@ class MPDArt(QDialog):
 
         self.ui = Ui_mpdart()
         self.ui.setupUi(self)        
-        #self.setShortcut()
+        self.setShortcut()
         self.installEventFilter(self)
 
         self.icon = icon or self.CONFIG.get_config('icon', 'path')
@@ -145,6 +158,37 @@ class MPDArt(QDialog):
         #self.timer.timeout.connect(self.showTime)
         self.timer.timeout.connect(self.showData)
         self.timer.start(self.CONFIG.get_config('sleep', 'time', '1000'))
+        
+    def send_notify(self, message, title, event = 'play', cover_art = None, app = 'MPD-Art'):
+        cover_art = cover_art or self.DEFAULT_COVER
+        debug(cover_art = cover_art)
+        debug(NOTIFY2 = NOTIFY2)
+        debug(XNOTIFY = XNOTIFY)
+        if NOTIFY2 and self.CONFIG.get_config('notification', 'notify2') == 1:
+            print("send notify [LINUX]: {}".format(message))
+            pnotify = pynotify.Notification("MPD-Art " + title + " " + event, message, "file://" + cover_art)
+            pnotify.show()            
+        if XNOTIFY and self.CONFIG.get_config('notification', 'xnotify') == 1:
+            growl = self.CONFIG.get_config('xnotify', 'growl') or False
+            growl_host = list(filter(None, [i.strip() for i in re.split(",|\n", self.CONFIG.get_config('xnotify', 'grow_host'))]))
+            nmd = self.CONFIG.get_config('xnotify', 'nmd') or False
+            nmd_api = self.CONFIG.get_config('xnotify', 'nmd_api')
+            pushbullet = self.CONFIG.get_config('xnotify', 'pushbullet') or False
+            pushbullet_api = self.CONFIG.get_config('xnotify', 'pushbullet_api')
+            ntfy = self.CONFIG.get_config('xnotify', 'ntfy') or False
+            ntfy_server = list(filter(None, [i.strip() for i in re.split(",|\n", self.CONFIG.get_config('xnotify', 'ntfy_server'))]))
+            
+            notify.active_growl = growl
+            notify.active_nmd = nmd
+            notify.active_pushbullet = pushbullet
+            notify.active_ntfy = ntfy
+            notify.host = growl_host
+            notify.nmd_api = nmd_api
+            notify.pushbullet_api = pushbullet_api
+            notify.ntfy_server = ntfy_server
+            print("send notify: {}".format(message))
+            notify.send('MPD-Art: ' + title + " " + event, message, app, event, growl_host, icon = cover_art, iconpath = cover_art, ntfy = ntfy, nfty_sever = ntfy_server, pushbullet_api = pushbullet_api, nmd_api = nmd_api, pushbullet = pushbullet, nmd = nmd, growl = growl)
+            
         
     def setOnTop(self):
         if self.ui.cb_top.isChecked():
@@ -435,26 +479,26 @@ class MPDArt(QDialog):
                 os.makedirs(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album')))
             img.save(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext))
         if os.path.isfile(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)):
-            self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
-            return os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
+            if self.check_is_image(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)):
+                self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
+                return os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
         
-        if refresh:
-            self.cover = ''
+        if refresh: self.cover = ''
         debug(self_cover = self.cover)
         if self.cover:
             if not os.path.isfile(self.cover): self.cover = os.path.join(self.music_dir, "\\".join(os.path.splitext(file)[0].split("/")[1:])) + '.jpg'
             debug(self_cover = self.cover)
             if not os.path.isfile(self.cover): self.cover = os.path.join(self.music_dir, "\\".join(os.path.splitext(file)[0].split("/")[1:])) + '.png'
             debug(self_cover = self.cover)
-            if os.path.isfile(self.cover):
-                if os.path.exists(self.cover):
-                    #print('return 1.....')
-                    return self.cover        
-            if self.current_song.get('file') == file and (not self.cover or not os.path.isfile(self.cover)):
+            #if os.path.isfile(self.cover):
+            if self.check_is_image(self.cover):
+                #print('return 1.....')
+                return self.cover        
+            if self.current_song.get('file') == file and (not self.cover or not self.check_is_image(self.cover)):
                 cover_file = os.path.join(music_dir, "\\".join(file.split("/")[1:]))
                 debug(cover_file = cover_file)
                 self.cover = self.get_cover_tag(cover_file)
-            if os.path.isfile(self.cover):
+            if self.check_is_image(self.cover):
                 #print('return 2.....')
                 return self.cover
         valid_cover = list(filter(None, [i.strip() for i in re.split(",|\n|\t", self.CONFIG.get_config('cover', 'valid'))])) or ['cover.jpg', 'cover2.jpg', 'cover.png', 'cover2.png', 'folder.jpg', 'folder.png', 'front.jpg', 'front.png', 'albumart.jpg', 'albumart.png', 'folder1.jpg', 'folder1.png', 'back.jpg', 'back.png']
@@ -469,14 +513,15 @@ class MPDArt(QDialog):
             else:
                 self.cover = os.path.join(self.music_dir, os.path.dirname(file), i)
             debug(self_cover = self.cover)
-            if self.cover:
+            #if self.cover:
+            debug(self_cover = self.cover)
+            if self.check_is_image(self.cover):
+                #print('return 3.....')
                 debug(self_cover = self.cover)
-                if os.path.isfile(self.cover):
-                    #print('return 3.....')
-                    return self.cover
-        debug(self_cover = self.cover)
-        if not self.cover: self.cover = ''
-        if os.path.isfile(self.cover):
+                return self.cover
+            else:
+                self.cover: self.cover = ''
+        if self.check_is_image(self.cover):
             debug(self_cover = self.cover)
             #print('return 4.....')
             return self.cover
@@ -487,7 +532,7 @@ class MPDArt(QDialog):
                     if chost == '0.0.0.0':
                         chost = '127.0.0.1'
                     fc.write(requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port'))).content)
-                if os.path.isfile(os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')):
+                if self.check_is_image(os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')):
                     return os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')
             except:
                 print(traceback.format_exc())
@@ -500,63 +545,104 @@ class MPDArt(QDialog):
                     if not self.cover or self.cover.split(os.path.sep)[-1] == 'no-cover.png': self.FAIL_LAST_FM = True
                     debug(self_FAIL_LAST_FM = self.FAIL_LAST_FM)
         debug(self_cover = self.cover)
-        if not self.cover:
+        if not self.check_is_image(self.cover):
             return self.DEFAULT_COVER
-        elif not os.path.isfile(self.cover):
-            return self.DEFAULT_COVER
+        return self.cover
 
-    def showData(self, host = None, port = None):
+    def check_is_image(self, file):
+        try:
+            im = Image.open(file)
+            im.verify()
+            im.close()
+            return True
+        except:
+            return False
+        
+    def showData(self, host = None, port = None, timeout = None):
+        timeout = self.timeout or self.CONFIG.get_config('mpd', 'timeout') or 60
         label = ''
+        title_msg = ''
+        track = '0'
+        title = '~ no title / unknown ~'
+        album = '~ no album / unknown ~'
+        albumartist = '~ no albumartist / unknown ~'
+        date = '~ no date / unknown ~'
+        label = ''
+        bitrate = ''
+        genres = ''
+        
         #c = self.conn(host, port)
         #current_state = self.conn(host, port).status()
         try:
-            current_state = self.conn('status', host = host, port = port, refresh = True)
-            debug(current_state = current_state)
+            current_state = self.CONN.status()
+        except ConnectionError:
+            try:
+                current_state = self.conn('status', host = host, port = port, refresh = True)
+                debug(current_state = current_state)
+                self.CONN.connect(host, port, timeout)
+            except mpd.base.ConnectionError:
+                current_state = {}
         except mpd.base.ConnectionError:
-            current_state = {}
-        try:
-            current_song = self.conn('currentsong', host = host, port = port, refresh = True)
-            debug(current_song = current_song)
-        except mpd.base.CommandError:
-            current_song = {}
-        if not self.current_song == current_song and current_song: self.cover = ''
-        self.current_song = current_song
-        disc = current_song.get('disc') or '0'
-        if disc: disc = disc.zfill(2)
+            current_state = {}        
 
+        try:
+            current_song = self.CONN.currentsong()
+        except ConnectionError:
+            try:
+                current_song = self.conn('currentsong', host = host, port = port, refresh = True)
+                debug(current_song = current_song)
+                self.CONN.connect(host, port, timeout)
+            except mpd.base.CommandError:
+                current_song = {}
+        except mpd.base.ConnectionError:
+            current_state = {}        
+        if not self.current_song == current_song and current_song: self.cover = ''
+        
         if current_song:
+            track = current_song.get('track')
+            title = current_song.get('title')
+            album = current_song.get('album')
+            albumartist = current_song.get('albumartist')
+            date = current_song.get('date')
+            artist = current_song.get('artist')
+            disc = current_song.get('disc') or '0'
+            label = current_song.get('label') or ''
+            duration = current_song.get('duration') or ''
+            genres = current_song.get('genre') or ''
+            
             self.ui.track.setText(
-                current_song.get('track').zfill(2) + "/" + \
-                disc + ". " + \
-                current_song.get('title')
+                track.zfill(2) + "/" + \
+                disc.zfill(2) + ". " + \
+                title
             )
 
-            title = '{} {} / {} - {}'.format(current_song.get('track').zfill(2) + "/" + disc + ". ", current_song.get('title'), current_song.get('album'), current_song.get('artist'))
-            debug(title = title)
-            self.setWindowTitle(title)
+            title_msg = '{} {} / {} - {}'.format(track.zfill(2) + "/" + disc.zfill(2) + ". ", title, album, artist)
+            debug(title_msg = title_msg)
+            self.setWindowTitle(title_msg)
+            
             try:
-                self.dark_view.setWindowTitle()
+                self.dark_view.setWindowTitle(title_msg)
             except:
                 pass
+            
             self.ui.album.setText(
-                current_song.get('album') + " / " + \
-                current_song.get('albumartist') + " (" + \
-                current_song.get('date') + ")"
+                album + " / " + \
+                albumartist + " (" + \
+                date + ")"
             )
             
             self.ui.artist.setText(
-                current_song.get('artist')
+                artist
             )
 
             self.last_dir = os.path.dirname(current_song.get('file'))
-            label = (current_song.get('label') or '') + " - "
-            if not label: label = ''
-
+            if label: label = label + " - "
+            
         if current_state.get('state') == 'play' or current_state.get('state') == 'pause':
             self.ui.pbar.setValue(int((float(current_state.get('elapsed')) / float(current_state.get('duration'))) * 100))
-
+            bitrate = current_state.get('bitrate')
             self.ui.bitrate.setText(
-                current_state.get('bitrate') + " - " + \
+                bitrate + " - " + \
                 label 
             )
             self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "jpg")
@@ -569,6 +655,37 @@ class MPDArt(QDialog):
                 if os.path.isfile(self.cover):
                     self.setWindowIcon(QIcon(self.cover))
                     self.setPixmap(self.cover)
+        debug(current_song = current_song)
+        debug(self_current_song = self.current_song)
+        debug(current_state = current_state)
+        debug(self_current_state = self.current_state)
+        msg = ''
+        if not self.current_song.get('file') == current_song.get('file') and title:
+            msg = track + "/" +\
+                disc  + ". " +\
+                title + " (" +\
+                duration + ")" +\
+                "\n" +\
+                artist + "\n" +\
+                album + "\n" +\
+                genres + "\n" + \
+                current_state.get('state')
+            self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
+            print("send info current song")
+            self.first = True
+        self.current_song = current_song
+        
+        if not self.current_state.get('state') == current_state.get('state') and not self.first:
+            self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
+            print("send info current state")
+        self.current_state = current_state
+        
+        debug(current_song = current_song)
+        debug(self_current_song = self.current_song)
+        debug(current_state = current_state)
+        debug(self_current_state = self.current_state)
+        #print("-" *125)
+        #sys.exit()
 
     def setShortcut(self):
         self.quit_shortcut = QShortcut(QKeySequence("esc"), self)
@@ -576,20 +693,67 @@ class MPDArt(QDialog):
 
         self.quit_shortcut = QShortcut(QKeySequence("q"), self)
         self.quit_shortcut.activated.connect(self.close)
+
+    def eventFilter(self, obj, event):
+        # if (event.type() == QtCore.QEvent.Resize):
+                # print( 'Inside event Filter')
+        return super().eventFilter(obj, event)
     
+    def keyPressEvent(self, event):
+        keyname = ''
+        key = event.key()
+        modifiers = int(event.modifiers())
+
+        keyname = QKeySequence(modifiers + key).toString()
+        try:
+            print("keyname:", keyname)
+        except:
+            pass
+        # print("self.ui.tabWidget.getCurrentIndex:", self.ui.tabWidget.currentIndex())
+
+        if (modifiers and modifiers & MOD_MASK == modifiers and
+            key > 0 and key != Qt.Key_Shift and key != Qt.Key_Alt and
+            key != Qt.Key_Control and key != Qt.Key_Meta):
+
+            print('event.text(): %r' % event.text())
+            print('event.key(): %d, %#x, %s' % (key, key, keyname))
+
+            #if keyname == 'Ctrl+C':
+                #self.select_project_dialog()
+        #if keyname == 'Down':
+            #self.move_next_Scroll(event, 30)
+        #elif keyname == 'Up':
+            #self.move_previous_Scroll(event, 30)
+        #elif keyname == 'PgDown':
+            ## print("PgUp .................")
+            #self.move_next_Scroll(event, 200)
+        #elif keyname == 'PgUp':
+            ## print("PgDown .................")
+            #self.move_previous_Scroll(event, 200)
+        if keyname == 'Left':
+            self.seek_prev()
+        elif keyname == 'Right':
+            self.seek_next()
+
+        self.keyPressed.emit(keyname)
+    
+    def seek_next(self):
+        self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time')) + float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
+    def seek_prev(self):
+        self.conn('seek', (int(self.current_song.get('pos')), float(self.current_state.get('time')) - float(self.CONFIG.get_config('playback', 'seek', '10') or 10)))
     def get_dev_ip(self, suggest = None):
         data = []
         for ifaceName in interfaces():
             addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':''}] )]
             #print('{}: {}'.format(ifaceName, ", ".join(addresses)))
             data.append(", ".join(addresses))
-        debug(data = data, debug = 1)
+        debug(data = data)
         data = list(filter(None, data))
         if suggest:
             ip1 = suggest.split(".")[:-1]
-            debug(ip1 = ip1, debug = 1)
+            debug(ip1 = ip1)
             ip = list(filter(lambda k: k.split(".")[:-1] == ip1, data))
-            debug(ip = ip, debug = 1)
+            debug(ip = ip)
         return ip[0]
         
     def setToolTip(self):

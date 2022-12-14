@@ -9,6 +9,7 @@ Music Player Daemon Current playing info
 ## requirement
 -------------------
     - netifaces
+    - Pillow
     - make_colors
     - pydebugger
     - mutagen >= 1.43.1
@@ -19,7 +20,8 @@ Music Player Daemon Current playing info
     - qt-material
     - configset
     - python-mpd2 / python-mpd
-    - xnotify
+    - xnotify (option for notification to growl/pushbullet/nmd/ntfy on nix/win)
+    - notify2 (option for local notification on nix)
     - mimelist
     - python 3+
     
