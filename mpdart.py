@@ -92,7 +92,7 @@ class MPDArt(QDialog):
     configfile = CONFIG.get_config('config', 'file')
     sleep = CONFIG.get_config('sleep', 'time') or 1000
     icon = CONFIG.get_config('icon', 'path')
-    music_dir = CONFIG.get_config('mpd', 'dir')
+    music_dir = CONFIG.get_config('mpd', 'music_dir')
     timeout = CONFIG.get_config('mpd', 'timeout')
     CONN = MPDClient()
     debug(host = host)
@@ -160,11 +160,125 @@ class MPDArt(QDialog):
         #self.setToolTip()
         self.ui.cb_top.stateChanged.connect(self.setOnTop)
         
+        if sys.platform == "win32":
+            self.change_font(self.CONFIG.get_config('font', 'all'))
+        else:
+            self.change_font(6)
+        self.change_color()
+        self.change_opacity()
+        
+        #fi = self.ui.artist.fontInfo()
+        #print("font artist:", fi.pointSize())
+        
         self.timer = QTimer(self)
         #self.timer.timeout.connect(self.showTime)
         self.timer.timeout.connect(self.showData)
         self.timer.start(self.CONFIG.get_config('sleep', 'time', '1000'))
         
+    def set_font_size(self, object, size = 6, weight = 75, bold = None, italic = None):
+        font = ''
+        if (size or weight): font = QtGui.QFont()
+        if size and font: font.setPointSize(int(size))
+        debug(weight = weight, debug = 1)
+        if weight and font: font.setWeight(weight)
+        if isinstance(bold, bool) and font: font.setBold(bold)
+        if isinstance(italic, bool) and font: font.setItalic(italic)
+        object.setFont(font)
+        
+    def set_opacity(self, n = 1.0): 
+        self.setWindowOpacity(n)
+    
+    def set_color(self, object, fg = None, bg = None):
+        bg = bg or (29, 29, 29)
+        fg = fg or (170, 255, 0)
+        object.setStyleSheet(
+            "background-color: rgb({});\n"
+            "color: rgb({});".format(*bg, *fg)
+        )
+        
+    def parse_font(self, label):
+        if isinstance(label, str):
+            size, family, weight, bold, italic = 6, None, 75, '', ''
+            font = self.CONFIG.get_config('font', label).split(",")
+            if len(font) == 2:
+                size, family = font
+            elif len(font) == 3:
+                size, family, weight = font
+            elif len(font) == 4:
+                size, family, weight, bold = font
+            elif len(font) == 5:
+                size, family, weight, bold, italic = font            
+            elif len(font) == 1:
+                if font[0].isdigit():
+                    font = font[0]
+                else:
+                    family = font[0]
+            return size, family, weight, bold, italic
+        
+    def parse_color(self, label):
+        fg, bg = (170, 255, 0), (29, 29, 29)
+        color = self.CONFIG.get_config('color', label).split("#")
+        if len(color) == 2:
+            fg, bg = color
+            fg = (fg)
+            bg = (bg)
+        elif len(font) == 1:
+            fg = color[0]
+            fg = (fg)
+        return fg, bg
+        
+    def change_font(self, all_size = None):
+        if self.CONFIG.get_config('font', 'artist') or all_size:
+            size, family, weight, bold, italic = self.parse_font('artist')
+            size = all_size or size
+            if size: self.set_font_size(self.ui.artist, size, weight, bold, italic)
+            if family: self.ui.artist.setStyleSheet("font: {}pt \"{}\";".format(size, family))
+        if self.CONFIG.get_config('font', 'album') or all_size:
+            size, family, weight, bold, italic = self.parse_font('album')
+            size = all_size or size
+            if size: self.set_font_size(self.ui.album, size, weight, bold, italic)
+            if family: self.ui.album.setStyleSheet("font: {}pt \"{}\";".format(size, family))
+        if self.CONFIG.get_config('font', 'track') or all_size:
+            size, family, weight, bold, italic = self.parse_font('track')
+            size = all_size or size
+            if size: self.set_font_size(self.ui.track, size, weight, bold, italic)
+            if family: self.ui.track.setStyleSheet("font: {}pt \"{}\";".format(size, family))
+        if self.CONFIG.get_config('font', 'bitrate') or all_size:
+            size, family, weight, bold, italic = self.parse_font('bitrate')
+            size = all_size or size
+            if size: self.set_font_size(self.ui.bitrate, size, weight, bold, italic)
+            if family: self.ui.bitrate.setStyleSheet("font: {}pt \"{}\";".format(size, family))
+        if self.CONFIG.get_config('font', 'comment') or all_size:
+            size, family, weight, bold, italic = self.parse_font('comment')
+            size = all_size or size
+            if size: self.set_font_size(self.ui.comment, size, weight, bold, italic)
+            if family: self.ui.comment.setStyleSheet("font: {}pt \"{}\";".format(size, family))
+        
+    def change_color(self):
+        if self.CONFIG.get_config('color', 'artist'):
+            fg, bg = self.parse_color('artist')
+            self.set_color(self.ui.artist, fg, bg)
+        if self.CONFIG.get_config('color', 'album'):
+            fg, bg = self.parse_color('album')
+            self.set_color(self.ui.album, fg, bg)
+        if self.CONFIG.get_config('color', 'track'):
+            fg, bg = self.parse_color('track')
+            self.set_color(self.ui.track, fg, bg)
+        if self.CONFIG.get_config('color', 'bitrate'):
+            fg, bg = self.parse_color('bitrate')
+            self.set_color(self.ui.bitrate, fg, bg)
+        if self.CONFIG.get_config('color', 'comment'):
+            fg, bg = self.parse_color('comment')
+            self.set_color(self.ui.comment, fg, bg)
+        
+    def change_opacity(self):
+        if self.CONFIG.get_config('opacity', 'transparent'):
+            try:
+                v = float(self.CONFIG.get_config('opacity', 'transparent'))
+                self.set_opacity(v)
+            except:
+                pass
+            
     def send_notify(self, message, title, event = 'play', cover_art = None, app = 'MPD-Art'):
         cover_art = cover_art or self.DEFAULT_COVER
         debug(cover_art = cover_art)
@@ -256,8 +370,8 @@ class MPDArt(QDialog):
             self.command = func
             return getattr(self.CONN, func)(*args)
         except:
-            if not self.first:
-                print(traceback.format_exc())
+            #if not self.first:
+                #print(traceback.format_exc())
             try:
                 c = MPDClient()
                 c.connect(host, port, timeout)
@@ -597,6 +711,7 @@ class MPDArt(QDialog):
         genres = ''
         current_song = {}
         current_state = {}
+        disc = "0"
         
         #c = self.conn(host, port)
         #current_state = self.conn(host, port).status()
@@ -643,7 +758,7 @@ class MPDArt(QDialog):
                 title
             )
 
-            title_msg = '{} {} / {} - {}'.format(track.zfill(2) + "/" + disc.zfill(2) + ". ", title, album, artist)
+            title_msg = '{} {} / {} - {} [{}]'.format(track.zfill(2) + "/" + disc.zfill(2) + ". ", title, album, artist, current_state.get('state'))
             debug(title_msg = title_msg)
             self.setWindowTitle(title_msg)
             
@@ -661,6 +776,8 @@ class MPDArt(QDialog):
             self.ui.artist.setText(
                 artist
             )
+            
+            self.ui.comment.setText(current_state.get('state'))
 
             self.last_dir = os.path.dirname(current_song.get('file'))
             if label: label = label + " - "
@@ -877,7 +994,7 @@ class MPDArt(QDialog):
                     self.dark_view.setMaximumSize(self.maximumSize())
                     self.dark_view.setMaximumHeight(self.maximumHeight())
                     self.dark_view.setMaximumWidth(self.maximumWidth())
-                    self.dark_view.setFixedSize(self.maximumWidth() + 10, self.maximumHeight() + 40)
+                    self.dark_view.setFixedSize(self.maximumWidth() + 2, self.maximumHeight() + 31)
                     try:
                         self.installEventFilter(self.dark_view)
                     except:

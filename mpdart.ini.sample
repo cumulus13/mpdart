@@ -1,46 +1,109 @@
 [mpd]
+#if not set then get from os enviroment MPD_HOST
 host = 
+
+#if not set then get from os enviroment MPD_PORT
 port = 
-dir = 
+
+#if not set then get from argument
 timeout = 60
+
+#if not set then must get from argument
 music_dir = 
 
 [config]
+#option for this file name, if set then all options get from this file
 file = 
 
 [sleep]
+#value on miliseconds, 1000 miliseconds = 1 seconds
 time = 1000
 
 [icon]
+#full file path or get file from directory where this file
 path = 
 
 [cover]
+#list valid cover name, example: cover.jpg, cover2.jpg, cover.png, cover2.png, folder.jpg, folder.png, front.jpg, front.png, albumart.jpg, albumart.png, folder1.jpg, folder1.png, back.jpg, back.png
 valid = 
 
 [GENERAL]
+#list growl events name
 events = 
 
 [lastfm]
-api = c725344c28768a57a507f014bdxxxxxx
-shared = d4c032479a1de021793b5f4d21xxxxxx
+api =  d4c032479a1de021793b5f4d21CCCCCC
+shared = d4c032479a1de021793b5f4d2104XXXX
 
 [cover_server]
+#run as cover server
 host = 192.168.0.2
 port = 8811
 
 [notification]
+#activate notifcation handle, notify2 only for *nix/linux
 xnotify = 1
+notify2 = 
 
 [xnotify]
+#activate growl
 growl = 
+
+#growl host, example: 127.0.0.1,192.168.0.3
 grow_host = 
+
+#activate notify my device
 nmd = 
+
+#notify my device API
 nmd_api = 
+
+#activate pushbullet
 pushbullet = 
+
+#pushbullet API
 pushbullet_api = 
+
+#activate ntfy/ntfy.sh
 ntfy = 
+
+#ntfy host, example: 127.0.0.1,192.168.0.3,ntfy.sh
 ntfy_server = 
 
 [playback]
+#seek step on seconds
 seek = 10
+
+[font]
+#format: size, family, weight, bold, italic, example: 10, Arial
+
+#set default font for all
+all = 
+
+#set font for artist label
+artist = 
+
+#set font for album label
+album = 
+
+#set font for album label
+track = 
+
+#set font for bitrate label
+bitrate = 
+
+#set font for comment/status label
+comment = 
+
+[color]
+#format: foreground, background, example: 170, 255, 0#29, 29, 29
+artist = 
+album = 
+track = 
+bitrate = 
+comment = 
+
+[opacity]
+#value in float / integer
+transparent = 
 
