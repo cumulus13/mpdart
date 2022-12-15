@@ -16,7 +16,7 @@ music_dir =
 file = 
 
 [sleep]
-#value on miliseconds, 1000 miliseconds = 1 seconds
+#refresh/load time, value on miliseconds, 1000 miliseconds = 1 seconds
 time = 1000
 
 [icon]
@@ -34,6 +34,10 @@ events =
 [lastfm]
 api =  d4c032479a1de021793b5f4d21CCCCCC
 shared = d4c032479a1de021793b5f4d2104XXXX
+
+[title]
+#show caption/title bar, 1 = show, 0 = hide/disable
+bar = 
 
 [cover_server]
 #run as cover server

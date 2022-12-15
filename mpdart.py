@@ -164,8 +164,10 @@ class MPDArt(QDialog):
             self.change_font(self.CONFIG.get_config('font', 'all'))
         else:
             self.change_font(6)
+        
         self.change_color()
         self.change_opacity()
+        self.change_title_bar()
         
         #fi = self.ui.artist.fontInfo()
         #print("font artist:", fi.pointSize())
@@ -271,6 +273,11 @@ class MPDArt(QDialog):
             fg, bg = self.parse_color('comment')
             self.set_color(self.ui.comment, fg, bg)
         
+    def change_title_bar(self):
+        if self.CONFIG.get_config('title', 'bar') == 0:
+            #print("change cation !")
+            self.setWindowFlag(Qt.FramelessWindowHint)
+            
     def change_opacity(self):
         if self.CONFIG.get_config('opacity', 'transparent'):
             try:
@@ -998,7 +1005,12 @@ class MPDArt(QDialog):
                     try:
                         self.installEventFilter(self.dark_view)
                     except:
-                        pass                    
+                        pass
+                    if self.CONFIG.get_config('title', 'bar'):
+                        try:
+                            self.dark_view.setWindowFlag(Qt.FramelessWindowHint)
+                        except:
+                            print(traceback.format_exc())                        
                     #self.dark_view.setWindowTitle()
                     self.dark_view.show()
                     self.show()
