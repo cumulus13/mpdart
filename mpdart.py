@@ -6,13 +6,10 @@
 from __future__ import print_function
 
 from netifaces import interfaces, ifaddresses, AF_INET
-import logging
-logger = logging.getLogger('MPD-Art')
-logger.setLevel(logging.DEBUG)
-
 from make_colors import make_colors
 from pydebugger.debug import debug
 import re
+import shutil
 #import socket
 import os
 import io
@@ -46,7 +43,7 @@ if not sys.platform == 'win32':
         import notify2 as pynotify
         NOTIFY2 = True
         if not pynotify.init("MPD status"):
-            print("warning: Unable to initialize dbus Notifications")
+            logger.error("warning: Unable to initialize dbus Notifications")
     except:
         NOTIFY2 = False
 
@@ -76,6 +73,42 @@ try:
     from . import mimelist
 except:
     import mimelist
+
+import logging
+
+class CustomFormatter(logging.Formatter):
+
+    info = "\x1b[32;20m"
+    debug = "\x1b[33;20m"
+    fatal = "\x1b[44;97m"
+    error = "\x1b[41;97m"
+    warning = "\x1b[43;30m"
+    critical = "\x1b[45;97m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(process)d - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: debug + format + reset,
+        logging.INFO: info + format + reset,
+        logging.WARNING: warning + format + reset,
+        logging.ERROR: error + format + reset,
+        logging.CRITICAL: warning + format + reset, 
+        logging.FATAL: fatal + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+#log_format = '%(name)s %(asctime)s %(process)d - %(levelname)s - %(message)s'
+#logging.basicConfig(format = log_format)
+logger = logging.getLogger('MPD-Art')
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(CustomFormatter())
+logger.addHandler(ch)
 
 MPD_HOST = '127.0.0.1'
 MPD_PORT = 6600
@@ -131,11 +164,11 @@ class MPDArt(QDialog):
         debug(music_dir = music_dir)
         
         if not self.music_dir:
-            print(make_colors("No Music Directory 'music_dir' setup !", 'lw', 'r'))
+            logger.warn(make_colors("No Music Directory 'music_dir' setup !", 'lw', 'r'))
             #return False
         if self.music_dir:
             if not os.path.isdir(self.music_dir) and self.music_dir[1:3] == ":\\":
-                print(make_colors("Invalid Music Directory 'music_dir'!, please setup before", 'lw', 'r'))
+                logger.warn(make_colors("Invalid Music Directory 'music_dir'!, please setup before", 'lw', 'r'))
                 #return False
         host0 = host
         debug(host0 = host0)
@@ -181,7 +214,7 @@ class MPDArt(QDialog):
         font = ''
         if (size or weight): font = QtGui.QFont()
         if size and font: font.setPointSize(int(size))
-        debug(weight = weight, debug = 1)
+        debug(weight = weight)
         if weight and font: font.setWeight(weight)
         if isinstance(bold, bool) and font: font.setBold(bold)
         if isinstance(italic, bool) and font: font.setItalic(italic)
@@ -292,7 +325,7 @@ class MPDArt(QDialog):
         debug(NOTIFY2 = NOTIFY2)
         debug(XNOTIFY = XNOTIFY)
         if NOTIFY2 and self.CONFIG.get_config('notification', 'notify2') == 1:
-            print("send notify [LINUX]: {}".format(message))
+            logger.debug("send notify [LINUX]: {}".format(message))
             pnotify = pynotify.Notification("MPD-Art " + title + " " + event, message, "file://" + cover_art)
             pnotify.show()            
         if XNOTIFY and self.CONFIG.get_config('notification', 'xnotify') == 1:
@@ -313,7 +346,7 @@ class MPDArt(QDialog):
             notify.nmd_api = nmd_api
             notify.pushbullet_api = pushbullet_api
             notify.ntfy_server = ntfy_server
-            print("send notify: {}".format(message))
+            logger.debug("send notify: {}".format(message))
             notify.send('MPD-Art: ' + title + " " + event, message, app, event, growl_host, icon = cover_art, iconpath = cover_art, ntfy = ntfy, nfty_sever = ntfy_server, pushbullet_api = pushbullet_api, nmd_api = nmd_api, pushbullet = pushbullet, nmd = nmd, growl = growl)
             
         
@@ -391,7 +424,8 @@ class MPDArt(QDialog):
                 return getattr(c, func)(*args)                
             except:
                 if not self.first:
-                    print(traceback.format_exc())
+                    #print(traceback.format_exc())
+                    logger.error(traceback.format_exc)
                     self.first = True
             #self.first = True
         self.command = func
@@ -444,7 +478,7 @@ class MPDArt(QDialog):
                 data_cover = f.picture[0]
         if not data_cover:
             if not self.first:
-                print(make_colors("Music file don't containt tag Cover !", 'lw', 'r'))
+                logger.warn(make_colors("Music file don't containt tag Cover !", 'lw', 'r'))
             if not sys.platform == 'win32':
                 if not self.first:
                     pnotify = pynotify.Notification("Error", "Music file don't containt tag Cover !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
@@ -468,7 +502,7 @@ class MPDArt(QDialog):
                 c.write(data_cover.data)
         if not os.path.isfile(os.path.join(save_dir, 'cover2.' + ext)):
             if not self.first:
-                print(make_colors("Invalid Cover !", 'lw', 'r'))
+                logger.error(make_colors("Invalid Cover !", 'lw', 'r'))
             if not sys.platform == 'win32':
                 if not self.first:
                     pnotify = pynotify.Notification("Error", "Invalid Cover !", "file://" + os.path.join(os.path.dirname(os.path.realpath(__file__)), "error.png"))
@@ -498,7 +532,7 @@ class MPDArt(QDialog):
                     if os.path.isfile(file_path):
                         return file_path, '', ''
             except ImportError:
-                print(make_colors("Please install 'mpd_album_art' before: 'pip install git+http://jameh.github.io/mpd-album-art' or input lastfm api key in config file, '{}'".format(self.CONFIG.configname), 'lw', 'r'))
+                logger.fatal(make_colors("Please install 'mpd_album_art' before: 'pip install git+http://jameh.github.io/mpd-album-art' or input lastfm api key in config file, '{}'".format(self.CONFIG.configname), 'lw', 'r'))
                 file_path = ''
 
         if not file_path and api_key:
@@ -545,13 +579,14 @@ class MPDArt(QDialog):
                         images = a.get('album').get('image')
                         debug(images = images)
                     else:
-                        print(make_colors("Not Artist or Album from LaST.fm [1] !", 'lw', 'r'))
+                        logger.warn(make_colors("Not Artist or Album from LaST.fm [1] !", 'lw', 'r'))
                         file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'no-cover.png')
                         if not os.path.isfile(file_path): file_path = ''
                         return file_path, '', thumb
                 except AttributeError:
-                    print(traceback.format_exc())
-                    print(make_colors("Not Artist or Album from LaST.fm [2] !", 'lw', 'r'))
+                    #print(traceback.format_exc())
+                    logger.error(traceback.format_exc())
+                    logger.warn(make_colors("Not Artist or Album from LaST.fm [2] !", 'lw', 'r'))
                     file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'no-cover.png')
                     if not os.path.isfile(file_path): file_path = ''
                     return file_path, '', thumb
@@ -597,15 +632,34 @@ class MPDArt(QDialog):
                             if not n == retries:
                                 n += 1
                             else:
-                                print(make_colors("ERROR:", 'lw', 'r') + traceback.format_exc())
+                                #print(make_colors("ERROR:", 'lw', 'r') + traceback.format_exc())
+                                logger.error(traceback.format_exc())
                                 break
         debug(file_path = file_path)
         if file_path:
             if not os.path.isfile(file_path): file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'no-cover.png')
         return file_path, img_url, thumb
 
-    def get_cover(self, file, current_song, music_dir = None, get_lastfm_cover = True, refresh = False):
-        img_data = self.conn('albumart', (file, ))
+    def get_cover(self, current_song, music_dir = None, get_lastfm_cover = True, refresh = False):
+        debug(music_dir = music_dir)
+        music_dir = music_dir or MPD_MUSIC_DIR or self.music_dir
+        debug(music_dir = music_dir)
+        
+        if os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg") or os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png"):
+            self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg") or os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png")
+            debug(self_cover = self.cover)
+            if self.check_is_image(self.cover):
+                debug(self_cover = self.cover)
+                return os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg") or os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png")
+        debug('No cover')
+        
+        if sys.platform == 'win32':
+            sep = "\\"
+        else:
+            sep = "/"
+        
+        debug(file = current_song.get('file'))
+        img_data = self.conn('albumart', (current_song.get('file'), ))
         ext = 'jpg'
         if img_data:
             img_data = img_data.get('binary')
@@ -615,27 +669,41 @@ class MPDArt(QDialog):
             img = Image.open(io.BytesIO(img_data))
             debug(check_ext = mimelist.get2(img.format))
             ext = mimelist.get2(img.format)[1]
-            if not os.path.isdir(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'))):
-                os.makedirs(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album')))
-            img.save(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext))
-        if os.path.isfile(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)):
-            if self.check_is_image(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)):
-                self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
-                return os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  ext)
+            if not os.path.isdir(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'))):
+                os.makedirs(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown')))
+            img.save(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext))
+            
+        if os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)):
+            if self.check_is_image(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)):
+                self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)
+                debug(self_cover_X = self.cover)
+                return os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)
+        debug(refresh = refresh)
+        debug(self_cover = self.cover)
+        debug(check_cover = self.check_is_image(self.cover))
         
         if refresh: self.cover = ''
         debug(self_cover = self.cover)
-        if self.cover:
-            if not os.path.isfile(self.cover): self.cover = os.path.join(self.music_dir, "\\".join(os.path.splitext(file)[0].split("/")[1:])) + '.jpg'
+        
+        if self.cover and self.check_is_image(self.cover):
+            if not os.path.isfile(self.cover):
+                if sys.platform == 'win32':
+                    self.cover = os.path.join(music_dir, sep.join(os.path.splitext(current_song.get('file'))[0].split("/")[1:])) + '.jpg'
+                else:
+                    self.cover = os.path.join(music_dir, os.path.splitext(current_song.get('file'))[0]) + '.jpg'
             debug(self_cover = self.cover)
-            if not os.path.isfile(self.cover): self.cover = os.path.join(self.music_dir, "\\".join(os.path.splitext(file)[0].split("/")[1:])) + '.png'
+            if not os.path.isfile(self.cover):
+                if sys.platform == 'win32':
+                    self.cover = os.path.join(music_dir, sep.join(os.path.splitext(current_song.get('file'))[0].split("/")[1:])) + '.png'
+                else:
+                    self.cover = os.path.join(music_dir, os.path.splitext(current_song.get('file'))[0]) + '.png'
             debug(self_cover = self.cover)
             #if os.path.isfile(self.cover):
             if self.check_is_image(self.cover):
                 #print('return 1.....')
                 return self.cover        
-            if self.current_song.get('file') == file and (not self.cover or not self.check_is_image(self.cover)):
-                cover_file = os.path.join(music_dir, "\\".join(file.split("/")[1:]))
+            if not self.cover or not self.check_is_image(self.cover):
+                cover_file = os.path.join(music_dir, sep.join(file.split("/")[1:]))
                 debug(cover_file = cover_file)
                 try:
                     self.cover = self.get_cover_tag(cover_file)
@@ -644,52 +712,84 @@ class MPDArt(QDialog):
             if self.check_is_image(self.cover):
                 #print('return 2.....')
                 return self.cover
+        debug(self_cover = self.cover)
         valid_cover = list(filter(None, [i.strip() for i in re.split(",|\n|\t", self.CONFIG.get_config('cover', 'valid'))])) or ['cover.jpg', 'cover2.jpg', 'cover.png', 'cover2.png', 'folder.jpg', 'folder.png', 'front.jpg', 'front.png', 'albumart.jpg', 'albumart.png', 'folder1.jpg', 'folder1.png', 'back.jpg', 'back.png']
-        debug(music_dir = music_dir)
-        music_dir = music_dir or MPD_MUSIC_DIR or self.music_dir
-        debug(music_dir = music_dir)
-        debug(cover_check_1 = file.split("/")[1:])
-        debug(file = file)
+        
+        debug(cover_check_1 = current_song.get('file').split("/")[1:])
+        #debug(file = file)
         for i in valid_cover:
+            #if sys.platform == 'win32':
+            debug(split_drive = os.path.join(music_dir, sep.join(os.path.dirname(current_song.get('file')).split("/")[1:]), i), sep = sep)
             if sys.platform == 'win32':
-                self.cover = os.path.join(self.music_dir, "\\".join(os.path.dirname(file).split("/")[1:]), i)
+                split_drive = os.path.join(music_dir, sep.join(os.path.dirname(current_song.get('file')).split("/")[1:]))
             else:
-                self.cover = os.path.join(self.music_dir, os.path.dirname(file), i)
+                split_drive = os.path.join(music_dir, sep.join(os.path.dirname(current_song.get('file')).split("/")))
+            self.cover = list(filter(lambda k: os.path.isfile(k), 
+                [
+                    os.path.join(split_drive, i),
+                    os.path.join(split_drive, i.title()), 
+                    os.path.join(split_drive, i.upper())
+                ]
+            ))
+            debug(self_cover = self.cover)
+            if self.cover:
+                self.cover = self.cover[0]
+            else:
+                self.cover = ''
+            #else:
+                #self.cover = os.path.join(music_dir, os.path.dirname(current_song.get('file')), i)
             debug(self_cover = self.cover)
             #if self.cover:
             debug(self_cover = self.cover)
-            if self.check_is_image(self.cover):
+            if self.cover and self.check_is_image(self.cover):
                 #print('return 3.....')
                 debug(self_cover = self.cover)
+                #sys.exit()
+                cover_dir = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'))
+                if not os.path.isdir(cover_dir): os.makedirs(cover_dir)
+                try:
+                    shutil.copy2(self.cover, cover_dir)
+                except Exception as e:
+                    #print(make_colors("shutil:", 'lw', 'r') + " " + make_colors(str(e), 'lw', 'bl'))
+                    logger.error(e)
+                    if os.getenv('TRACEBACK'):
+                        #print(traceback.format_exc())
+                        logger.error(traceback.format_exc())
                 return self.cover
             else:
                 self.cover: self.cover = ''
-        if self.check_is_image(self.cover):
+        #sys.exit()
+        if self.cover and self.check_is_image(self.cover):
             debug(self_cover = self.cover)
             #print('return 4.....')
+            #sys.exit()
             return self.cover
-        else:
-            try:
-                with open(os.path.join(self.COVER_TEMP_DIR, 'cover.jpg'), 'wb') as fc:
-                    chost = self.CONFIG.get_config('cover_server', 'host')
-                    if chost == '0.0.0.0':
-                        chost = '127.0.0.1'
-                    try:
-                        fc.write(requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port'))).content)
-                    except:
-                        pass
-                if self.check_is_image(os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')):
-                    return os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')
-            except:
-                print(traceback.format_exc())
-            if get_lastfm_cover:
+        try:
+            with open(os.path.join(self.COVER_TEMP_DIR, 'cover.jpg'), 'wb') as fc:
+                chost = self.CONFIG.get_config('cover_server', 'host')
+                debug(chost = chost)
+                if chost == '0.0.0.0': chost = '127.0.0.1'
+                try:
+                    fc.write(requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port'))).content)
+                except:
+                    pass
+            if self.check_is_image(os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')):
+                self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.jpg')
+                debug(self_cover = self.cover)
+                #sys.exit()
+                return os.path.join(self.COVER_TEMP_DIR, 'cover.jpg')
+        except:
+            #print(traceback.format_exc())
+            logger.error(traceback.format_exc())
+        #sys.exit()
+        if get_lastfm_cover:
+            debug(self_FAIL_LAST_FM = self.FAIL_LAST_FM)
+            if not self.FAIL_LAST_FM:
+                self.cover = self.get_cover_lastfm()[0]
+                debug(self_cover = self.cover)
+                debug(cover_split = self.cover.split(os.path.sep)[-1])
+                if not self.cover or self.cover.split(os.path.sep)[-1] == 'no-cover.png': self.FAIL_LAST_FM = True
                 debug(self_FAIL_LAST_FM = self.FAIL_LAST_FM)
-                if not self.FAIL_LAST_FM:
-                    self.cover = self.get_cover_lastfm()[0]
-                    debug(self_cover = self.cover)
-                    debug(cover_split = self.cover.split(os.path.sep)[-1])
-                    if not self.cover or self.cover.split(os.path.sep)[-1] == 'no-cover.png': self.FAIL_LAST_FM = True
-                    debug(self_FAIL_LAST_FM = self.FAIL_LAST_FM)
         debug(self_cover = self.cover)
         if not self.check_is_image(self.cover):
             return self.DEFAULT_COVER
@@ -733,7 +833,7 @@ class MPDArt(QDialog):
                 current_state = {}
         except mpd.base.ConnectionError:
             current_state = {}        
-
+        debug(current_state = current_state)
         try:
             current_song = self.CONN.currentsong()
         except ConnectionError:
@@ -746,6 +846,7 @@ class MPDArt(QDialog):
         except mpd.base.ConnectionError:
             current_state = {}        
         if not self.current_song == current_song and current_song: self.cover = ''
+        debug(current_song = current_song)
         
         if current_song:
             track = current_song.get('track')
@@ -796,15 +897,23 @@ class MPDArt(QDialog):
                 bitrate + " - " + \
                 label 
             )
+        #if current_song and (not os.path.isfile(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover.jpg')) or not os.path.isfile(os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover.png'))):
         if current_song:
             self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "jpg")
-        if not os.path.isfile(self.cover):
+            debug(self_cover = self.cover)
+        if not self.check_is_image(self.cover):
             self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "png")
-        if not os.path.isfile(self.cover):
-            self.cover = self.get_cover(current_song.get('file'), current_song, self.music_dir)
-        debug(self_cover = self.cover)
+            debug(self_cover = self.cover)
+        if not self.check_is_image(self.cover):
+            self.cover = self.get_cover(current_song, self.music_dir)
+            debug(self_cover = self.cover)
+            
+        #debug(self_cover = self.cover)
         
         if self.check_is_image(self.cover):
+            #print("set-cover: {}".format(self.cover))
+        #if self.cover:
+            #if os.path.isfile(self.cover):
             self.setWindowIcon(QIcon(self.cover))
             self.setPixmap(self.cover)
 
@@ -823,7 +932,7 @@ class MPDArt(QDialog):
             current_state.get('state')
         if not self.current_song.get('file') == current_song.get('file') and title:            
             self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
-            print("send info current song")
+            logger.debug("send info current song")
             #self.first = True
             #self.bring_to_front(self)
             try:
@@ -835,7 +944,7 @@ class MPDArt(QDialog):
         
         if not self.current_state.get('state') == current_state.get('state') and not self.first:
             self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
-            print("send info current state")
+            logger.debug("send info current state")
         self.current_state = current_state
         
         debug(current_song = current_song)
@@ -871,7 +980,7 @@ class MPDArt(QDialog):
 
         keyname = QKeySequence(modifiers + key).toString()
         try:
-            print("keyname:", keyname)
+            logger.debug("keyname: " + keyname)
         except:
             pass
         # print("self.ui.tabWidget.getCurrentIndex:", self.ui.tabWidget.currentIndex())
@@ -880,8 +989,8 @@ class MPDArt(QDialog):
             key > 0 and key != Qt.Key_Shift and key != Qt.Key_Alt and
             key != Qt.Key_Control and key != Qt.Key_Meta):
 
-            print('event.text(): %r' % event.text())
-            print('event.key(): %d, %#x, %s' % (key, key, keyname))
+            logger.debug('event.text(): %r' % event.text())
+            logger.debug('event.key(): %d, %#x, %s' % (key, key, keyname))
 
             #if keyname == 'Ctrl+C':
                 #self.select_project_dialog()
@@ -917,6 +1026,7 @@ class MPDArt(QDialog):
         data = []
         for ifaceName in interfaces():
             addresses = [i['addr'] for i in ifaddresses(ifaceName).setdefault(AF_INET, [{'addr':''}] )]
+            debug(addresses = addresses)
             #print('{}: {}'.format(ifaceName, ", ".join(addresses)))
             data.append(", ".join(addresses))
         debug(data = data)
@@ -949,12 +1059,16 @@ class MPDArt(QDialog):
         logger.warning('Server Run on: {}:{}'.format(host, port))
         debug(host = host)
         debug(port = port)
-        server = SocketServer.TCPServer((host, port), Handler)
+        #server = SocketServer.TCPServer((host, port), Handler)
 
         try:
+            server = SocketServer.TCPServer((host, port), Handler)
             server.serve_forever()
         except KeyboardInterrupt:
+            logging.error("Exception occurred", exc_info=True)
             os.kill(os.getpid(), signal.SIGTERM)
+        except:
+            logging.error(traceback.format_exc())
 
     def usage(self):
         parser = argparse.ArgumentParser('mpdart', epilog = make_colors('MPD Client info + Art', 'ly'))
@@ -1010,13 +1124,14 @@ class MPDArt(QDialog):
                         try:
                             self.dark_view.setWindowFlag(Qt.FramelessWindowHint)
                         except:
-                            print(traceback.format_exc())                        
+                            #print(traceback.format_exc())
+                            logger.error(traceback.format_exc())
                     #self.dark_view.setWindowTitle()
                     self.dark_view.show()
                     self.show()
                     app.exec_()
                 else:
-                    print(make_colors("No Music dir !", 'lw', 'r'))    
+                    logger.warning(make_colors("No Music dir !", 'lw', 'r'))    
 
 class CoverServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
     #global MPD_HOST
@@ -1029,28 +1144,33 @@ class CoverServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
     debug(MPD_PORT = MPD_PORT)
     debug(MPD_MUSIC_DIR = MPD_MUSIC_DIR)
     debug(MPD_SLEEP = MPD_SLEEP)    
-        
-    mpdart = MPDArt(music_dir = "/mnt/musics")
+    MPD_MUSIC_DIR = "/mnt/musics" or None
+    mpdart = MPDArt(music_dir = MPD_MUSIC_DIR)
     #mpdart = MPDArt(MPD_HOST, MPD_PORT, MPD_SLEEP, MPD_MUSIC_DIR)
     #CONFIG = mpdart.CONFIG
 
     def handle_one_request(self):
-        print("CLIENT:", self.client_address[0])
+        logger.debug("CLIENT: " + self.client_address[0])
         if self.mpdart.CONFIG.get_config('cover_server', 'host') == '0.0.0.0':
+            debug(client_address_netiface = self.mpdart.get_dev_ip(self.client_address[0]))
             self.mpdart.CONFIG.write_config('cover_server', 'host', self.mpdart.get_dev_ip(self.client_address[0]))
         
         return SimpleHTTPServer.SimpleHTTPRequestHandler.handle_one_request(self)
     
     def do_GET(self):
-        print("self.path:", self.path)
+        logger.debug("self.path: " + self.path)
         cover = ''
         debug(self_path = self.path)
         if self.path == '/':
-            print("self.PATH OK " + "X" *1000)
+            logger.debug("self.PATH OK ")
             current_song = self.mpdart.conn('currentsong', (), refresh = True)
             debug(current_song = current_song)
             if current_song.get('file'):
-                cover = self.mpdart.get_cover(current_song.get('file'), refresh = True)
+                cover = self.mpdart.get_cover(current_song, self.MPD_MUSIC_DIR, refresh = True)
+                debug(cover = cover)
+                #sys.exit()
+                #if not self.mpdart.check_is_image(cover) or cover.split(os.path.sep)[-1] == 'no-cover.png':
+                    
             debug(cover = cover)
             if cover:
                 if os.path.isfile(cover):
@@ -1061,20 +1181,20 @@ class CoverServer(SimpleHTTPServer.SimpleHTTPRequestHandler):
                     self.wfile.write(f.read())
                     f.close()
             else:
-                print("CHECK FILE INDEX !")
+                logger.debug("CHECK FILE INDEX !")
                 if not os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'index.html')):
-                    print("TIDAK ADA FILE INDEX !")
+                    logger.debug("NO FILE INDEX !")
                     self.send_response(200)
                     self.send_header('Content-type', 'text/html')
                     self.end_headers()
                     self.wfile.write(b"<html><head><title>No-Cover</title></head><body><h1>No-Cover</h1></body></html>")
-                    print("END WRITE 1")
+                    logger.debug("END WRITE 1")
                 else:
-                    print("ADA FILE INDEX !")
+                    logger.debug("FILE INDEX EXISTS !")
                     with open(os.path.isfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'index.html')), 'rb') as fi:
                         self.send_response(200)                    
                         self.wfile.write(fi.read())
-                        print("END WRITE 2")
+                        logger.debug("END WRITE 2")
 
         return SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
@@ -1083,6 +1203,7 @@ if __name__ == '__main__':
     #usage()
     app = QApplication(sys.argv)
     c = MPDArt('192.168.0.2', 6600, 1, music_dir = r'f:\MUSICS')
+    #c.get_cover()
     c.usage()
     #c.show()
     #c.cover_server()
