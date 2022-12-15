@@ -425,7 +425,7 @@ class MPDArt(QDialog):
             except:
                 if not self.first:
                     #print(traceback.format_exc())
-                    logger.error(traceback.format_exc)
+                    logger.error(traceback.format_exc())
                     self.first = True
             #self.first = True
         self.command = func
@@ -715,15 +715,15 @@ class MPDArt(QDialog):
         debug(self_cover = self.cover)
         valid_cover = list(filter(None, [i.strip() for i in re.split(",|\n|\t", self.CONFIG.get_config('cover', 'valid'))])) or ['cover.jpg', 'cover2.jpg', 'cover.png', 'cover2.png', 'folder.jpg', 'folder.png', 'front.jpg', 'front.png', 'albumart.jpg', 'albumart.png', 'folder1.jpg', 'folder1.png', 'back.jpg', 'back.png']
         
-        debug(cover_check_1 = current_song.get('file').split("/")[1:])
+        debug(cover_check_1 = (current_song.get('file') or 'unknown').split("/")[1:])
         #debug(file = file)
         for i in valid_cover:
             #if sys.platform == 'win32':
-            debug(split_drive = os.path.join(music_dir, sep.join(os.path.dirname(current_song.get('file')).split("/")[1:]), i), sep = sep)
+            debug(split_drive = os.path.join(music_dir, sep.join(os.path.dirname((current_song.get('file') or 'unknown')).split("/")[1:]), i), sep = sep)
             if sys.platform == 'win32':
-                split_drive = os.path.join(music_dir, sep.join(os.path.dirname(current_song.get('file')).split("/")[1:]))
+                split_drive = os.path.join(music_dir, sep.join(os.path.dirname((current_song.get('file') or 'unknown')).split("/")[1:]))
             else:
-                split_drive = os.path.join(music_dir, sep.join(os.path.dirname(current_song.get('file')).split("/")))
+                split_drive = os.path.join(music_dir, sep.join(os.path.dirname((current_song.get('file') or 'unknown')).split("/")))
             self.cover = list(filter(lambda k: os.path.isfile(k), 
                 [
                     os.path.join(split_drive, i),
@@ -816,9 +816,11 @@ class MPDArt(QDialog):
         label = ''
         bitrate = ''
         genres = ''
+        artist = ''
         current_song = {}
         current_state = {}
         disc = "0"
+        duration = ''
         
         #c = self.conn(host, port)
         #current_state = self.conn(host, port).status()
@@ -902,7 +904,7 @@ class MPDArt(QDialog):
             self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "jpg")
             debug(self_cover = self.cover)
         if not self.check_is_image(self.cover):
-            self.cover = os.path.join(self.COVER_TEMP_DIR, current_song.get('artist'), current_song.get('album'), 'cover' + "." +  "png")
+            self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  "png")
             debug(self_cover = self.cover)
         if not self.check_is_image(self.cover):
             self.cover = self.get_cover(current_song, self.music_dir)
@@ -921,6 +923,18 @@ class MPDArt(QDialog):
         debug(self_current_song = self.current_song)
         debug(current_state = current_state)
         debug(self_current_state = self.current_state)
+        
+        track = track or current_song.get('track') or ''
+        title = title or current_song.get('title') or ''
+        album = album or current_song.get('album') or ''
+        albumartist = albumartist or current_song.get('albumartist') or ''
+        date = date or current_song.get('date') or ''
+        artist = artist or current_song.get('artist') or ''
+        disc = disc or current_song.get('disc') or '0'
+        label = label or current_song.get('label') or ''
+        duration = duration or current_song.get('duration') or ''
+        genres = genres or current_song.get('genre') or ''
+        state = current_state.get('state') or ''
         msg = track + "/" +\
             disc  + ". " +\
             title + " (" +\
@@ -929,7 +943,8 @@ class MPDArt(QDialog):
             artist + "\n" +\
             album + "\n" +\
             genres + "\n" + \
-            current_state.get('state')
+            state
+        
         if not self.current_song.get('file') == current_song.get('file') and title:            
             self.send_notify(msg, '{} ...'.format(current_state.get('state')), current_state.get('state'), self.cover)
             logger.debug("send info current song")

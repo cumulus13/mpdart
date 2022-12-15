@@ -2,13 +2,11 @@
 
 # Form implementation generated from reading ui file 'gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12.3
+# Created by: PyQt5 UI code generator 5.9.2
 #
 # WARNING! All changes made in this file will be lost!
 
-
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 class Ui_mpdart(object):
     def setupUi(self, mpdart):
@@ -68,7 +66,7 @@ class Ui_mpdart(object):
         font.setWeight(50)
         self.pbar.setFont(font)
         self.pbar.setStyleSheet("font: 5pt \"Consolas\";")
-        self.pbar.setProperty("value", 24)
+        self.pbar.setProperty("value", 0)
         self.pbar.setObjectName("pbar")
         self.cdart = QtWidgets.QLabel(mpdart)
         self.cdart.setGeometry(QtCore.QRect(320, 4, 91, 91))
@@ -126,3 +124,4 @@ if __name__ == "__main__":
     ui.setupUi(mpdart)
     mpdart.show()
     sys.exit(app.exec_())
+
