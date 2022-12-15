@@ -68,5 +68,5 @@ cover: will check image file for local/remote before if run on local then will c
     
 ## author
 ---------
-[cumulus13](cumulus13@gmail.com)
+[cumulus13](mailto:cumulus13@gmail.com)
     
