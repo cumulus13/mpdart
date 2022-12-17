@@ -294,7 +294,7 @@ class MPD(object):
             notify.ntfy_server = ntfy_server
             logger.debug("send notify: {}".format(message))
             try:
-                notify.send('MPD-Art: ' + title + " " + event, message, app, event, growl_host, icon = cover_art, iconpath = cover_art, ntfy = ntfy, nfty_sever = ntfy_server, pushbullet_api = pushbullet_api, nmd_api = nmd_api, pushbullet = pushbullet, nmd = nmd, growl = growl)
+                notify.send('MPD-Art: ' + (title or '') + " " + (event or 'play'), message, app, event, growl_host, icon = cover_art, iconpath = cover_art, ntfy = ntfy, nfty_sever = ntfy_server, pushbullet_api = pushbullet_api, nmd_api = nmd_api, pushbullet = pushbullet, nmd = nmd, growl = growl)
             except:
                 traceback.format_exc()
             logger.warning("send notification done ...")
