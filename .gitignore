@@ -8,6 +8,7 @@
 *.7z
 *.mp3
 *.wav
+test_*
 *.sublime-workspace
 .hg/
 build/
