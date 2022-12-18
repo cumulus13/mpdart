@@ -138,7 +138,8 @@ class MPD(object):
     FAIL_LAST_FM = False
     current_state = {}
     first = False
-    process = None    
+    process = None
+    process1 = None
     
     @classmethod
     def conn(self, func, args = (), host = None, port = None, refresh = False, repeat = False):
@@ -660,7 +661,11 @@ class MPD(object):
                 except:
                     pass                
             self.process = Pool(processes = 1)
-            r = self.process.apply_async(requests.get, args = ('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')),), kwds = {'timeout': (self.CONFIG.get_config('requests', 'timeout') or 6)})
+            r = None
+            try:
+                r = self.process.apply_async(requests.get, args = ('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')),), kwds = {'timeout': (self.CONFIG.get_config('requests', 'timeout') or 6)})
+            except Exception as e:
+                logger.warning("get cover from cover server [ERROR]: {}".format(e))
             nt = 0
             while 1:
                 try:
@@ -718,7 +723,37 @@ class MPD(object):
             logger.warning("get cover from LAST.FM")
             debug(self_FAIL_LAST_FM = self.FAIL_LAST_FM)
             if not self.FAIL_LAST_FM:
-                self.cover = MPD.get_cover_lastfm()[0]
+                if self.process1:
+                    try:
+                        self.process1.terminate()
+                    except:
+                        pass                
+                r1 = None
+                self.process1 = Pool(processes = 1)
+                try:
+                    r1 = self.process1.apply_async(MPD.get_cover_lastfm, args = ())
+                except Exception as e:
+                    logger.warning("get cover from LAST.FM [ERROR]: {}".format(e))
+                
+                #self.cover = MPD.get_cover_lastfm()[0]
+                nt1 = 0
+                while 1:
+                    try:
+                        logger.warning("get cover from LAST.FM")
+                        if r1.get():
+                            logger.warning("get cover from LAST.FM [FINISH]")
+                            break
+                    except Exception as e:
+                        logger.warning("get cover from LAST.FM [ERROR]: {}".format(e))
+                        debug(nt1 = nt1)
+                        if not nt1 >= self.CONFIG.get_config('lastfm', 'tries', '3') or 3:
+                            nt1 += 1
+                        else:
+                            r1 = None
+                            break
+                
+                if r1:
+                    self.cover = r1.get()[0]
                 debug(self_cover = self.cover)
                 debug(cover_split = self.cover.split(os.path.sep)[-1])
                 if not self.cover or self.cover.split(os.path.sep)[-1] == 'no-cover.png': self.FAIL_LAST_FM = True
