@@ -115,8 +115,7 @@ MPD_HOST = '127.0.0.1'
 MPD_PORT = 6600
 MPD_MUSIC_DIR = '' 
 MPD_SLEEP = 1
-APP = None
-
+APP = 'MPD-Art'
 MOD_MASK = (Qt.CTRL | Qt.ALT | Qt.SHIFT | Qt.META)
 
 class MPD(object):
@@ -141,7 +140,6 @@ class MPD(object):
     first = False
     process = None    
     
-        
     @classmethod
     def conn(self, func, args = (), host = None, port = None, refresh = False, repeat = False):
         if host and not host == self.host or port and not port == self.port:
@@ -200,6 +198,17 @@ class MPD(object):
         return {}
 
     @classmethod
+    def format_number(self, number, length = 10):
+        number = str(number).strip()
+        if not str(number).isdigit():
+            return number
+        zeros = len(str(length)) - len(number)
+        r = ("0" * zeros) + str(number)
+        if len(r) == 1:
+            return "0" + r
+        return r
+    
+    @classmethod
     def send_notify(self, current_song = None, current_state = None, event = 'stop', cover_art = None, app = 'MPD-Art'):
         label = ''
         track = '0'
@@ -211,8 +220,6 @@ class MPD(object):
         bitrate = ''
         genres = ''
         artist = ''
-        #current_song = {}
-        #current_state = {}
         disc = "0"
         duration = ''
         state = 'stop'
@@ -235,8 +242,6 @@ class MPD(object):
         logger.debug("current_song: {}".format(current_song))
         logger.debug("current_state: {}".format(current_state))        
         
-        #sys.exit()
-        
         if current_song and current_state:
             track = current_song.get('track') or track or ''
             title = current_song.get('title') or title or ''
@@ -253,20 +258,19 @@ class MPD(object):
             event = state or event or 'stop'
         
         message = track + "/" +\
-            disc  + ". " +\
-            title + " (" +\
-            duration + ")" +\
-            "\n" +\
-            artist + "\n" +\
-            album + "\n" +\
-            genres + "\n" + \
-            bitrate + "\n" + \
+            self.format_number(disc)  + ". " +\
+            title + "\n" + \
+            duration + "[" + bitrate + "] " + "\n" +\
+            "Artist : " + artist + "\n" + \
+            "Album  : " + album + "\n" + \
+            "Genres : " + genres + "\n\n" + \
             state
             
         cover_art = cover_art or self.DEFAULT_COVER
         debug(cover_art = cover_art)
         debug(NOTIFY2 = NOTIFY2)
         debug(XNOTIFY = XNOTIFY)
+        
         if NOTIFY2 and self.CONFIG.get_config('notification', 'notify2') == 1:
             logger.debug("send notify [LINUX]: {}".format(message))
             try:
@@ -274,6 +278,7 @@ class MPD(object):
                 pnotify.show()
             except:
                 traceback.format_exc()
+                
         if XNOTIFY and self.CONFIG.get_config('notification', 'xnotify') == 1:
             growl = self.CONFIG.get_config('xnotify', 'growl') or False
             growl_host = list(filter(None, [i.strip() for i in re.split(",|\n", self.CONFIG.get_config('xnotify', 'grow_host'))]))
@@ -294,7 +299,7 @@ class MPD(object):
             notify.ntfy_server = ntfy_server
             logger.debug("send notify: {}".format(message))
             try:
-                notify.send('MPD-Art: ' + (title or '') + " " + (event or 'play'), message, app, event, growl_host, icon = cover_art, iconpath = cover_art, ntfy = ntfy, nfty_sever = ntfy_server, pushbullet_api = pushbullet_api, nmd_api = nmd_api, pushbullet = pushbullet, nmd = nmd, growl = growl)
+                notify.send('MPD-Art:' + " " + (event or 'play'), message, app, event, growl_host, icon = cover_art, iconpath = cover_art, ntfy = ntfy, nfty_sever = ntfy_server, pushbullet_api = pushbullet_api, nmd_api = nmd_api, pushbullet = pushbullet, nmd = nmd, growl = growl)
             except:
                 traceback.format_exc()
             logger.warning("send notification done ...")
@@ -943,7 +948,7 @@ class Art(QDialog):
             except:
                 #self.bring_to_front(self)
                 pass
-            MPD.send_notify(self.current_song, self.current_state, event=self.current_state.get('state'), cover_art=self.cover)
+            #MPD.send_notify(self.current_song, self.current_state, event=self.current_state.get('state'), cover_art=self.cover)
             
             self.last_song = self.current_song.get('file')
             self.last_state = self.current_state.get('state')
@@ -967,8 +972,8 @@ class Art(QDialog):
                 
                 if not float(self.current) >= float(self.total):
                     self.ui.pbar.setValue(int((float(self.current) / float(self.total)) * 100))
-                    if self.last_state == 'stop' or not self.last_song == self.current_song.get('file'):
-                        logger.warning('stop --> play')
+                    if not self.last_state == 'play' or not self.last_song == self.current_song.get('file'):
+                        logger.warning('{} --> play'.format(self.last_state))
                         try:
                             self.bring_to_front(self.dark_view)
                         except:
@@ -980,9 +985,8 @@ class Art(QDialog):
                             #if self.current_song and self.current_state:
                             self.last_song = self.current_song.get('file')
                             self.last_state = self.current_state.get('state')
-                        if self.last_state == ('stop' or 'pause'):
+                        #if self.last_state == ('stop' or 'pause'):
                             MPD.send_notify(self.current_song, self.current_state, self.current_state.get('state'), cover_art=self.cover,)
-                    self.last_state = self.current_state.get('state')
                 #else:
                 elif float(self.current) >= float(self.total) or not self.last_song == self.current_song.get('file'):
                     logger.warning('prepare next song')
@@ -994,6 +998,10 @@ class Art(QDialog):
                     logger.warning('play next song')
                     self.last_song = self.current_song.get('file')
                     self.last_state = self.current_state.get('state')
+                    
+                self.last_state = self.current_state.get('state')
+                self.ui.comment.setText(self.current_state.get('state'))
+                if self.current_state.get('state') == 'stop': self.ui.pbar.setValue(0)
                         
             elif self.current_state.get('state') == 'pause' or not self.last_song == self.current_song.get('file'):
                 if not self.last_state == 'pause':
