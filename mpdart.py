@@ -748,7 +748,7 @@ class MPD(object):
                     except Exception as e:
                         logger.warning("get cover from LAST.FM [ERROR]: {}".format(e))
                         debug(nt1 = nt1)
-                    if not nt1 >= self.CONFIG.get_config('lastfm', 'tries', '3') or 3:
+                    if not nt1 > (self.CONFIG.get_config('lastfm', 'tries', '3') or 3):
                         nt1 += 1
                     else:
                         r1 = None
