@@ -662,12 +662,13 @@ class MPD(object):
                     pass                
             self.process = Pool(processes = 1)
             r = None
-            try:
-                r = self.process.apply_async(requests.get, args = ('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')),), kwds = {'timeout': (self.CONFIG.get_config('requests', 'timeout') or 6)})
-            except Exception as e:
-                logger.warning("get cover from cover server [ERROR]: {}".format(e))
+            
             nt = 0
             while 1:
+                try:
+                    r = self.process.apply_async(requests.get, args = ('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')),), kwds = {'timeout': (self.CONFIG.get_config('requests', 'timeout') or 6)})
+                except Exception as e:
+                    logger.warning("get cover from cover server [ERROR]: {}".format(e))                
                 try:
                     logger.warning("get cover from cover server")
                     if r.get():
@@ -676,11 +677,11 @@ class MPD(object):
                 except Exception as e:
                     logger.warning("get cover from cover server [ERROR]: {}".format(e))
                     debug(nt = nt)
-                    if not nt >= self.CONFIG.get_config('cover_server', 'tries', '3') or 3:
-                        nt += 1
-                    else:
-                        r = None
-                        break
+                if not nt >= self.CONFIG.get_config('cover_server', 'tries', '3') or 3:
+                    nt += 1
+                else:
+                    r = None
+                    break
                     
             #r = requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')), timeout = (self.CONFIG.get_config('requests', 'timeout') or 5))
             if r:
@@ -730,14 +731,15 @@ class MPD(object):
                         pass                
                 r1 = None
                 self.process1 = Pool(processes = 1)
-                try:
-                    r1 = self.process1.apply_async(MPD.get_cover_lastfm, args = ())
-                except Exception as e:
-                    logger.warning("get cover from LAST.FM [ERROR]: {}".format(e))
                 
                 #self.cover = MPD.get_cover_lastfm()[0]
                 nt1 = 0
                 while 1:
+                    try:
+                        r1 = self.process1.apply_async(MPD.get_cover_lastfm, args = ())
+                    except Exception as e:
+                        logger.warning("get cover from LAST.FM [ERROR]: {}".format(e))
+                                        
                     try:
                         logger.warning("get cover from LAST.FM")
                         if r1.get():
@@ -746,14 +748,13 @@ class MPD(object):
                     except Exception as e:
                         logger.warning("get cover from LAST.FM [ERROR]: {}".format(e))
                         debug(nt1 = nt1)
-                        if not nt1 >= self.CONFIG.get_config('lastfm', 'tries', '3') or 3:
-                            nt1 += 1
-                        else:
-                            r1 = None
-                            break
+                    if not nt1 >= self.CONFIG.get_config('lastfm', 'tries', '3') or 3:
+                        nt1 += 1
+                    else:
+                        r1 = None
+                        break
                 
-                if r1:
-                    self.cover = r1.get()[0]
+                if r1: self.cover = r1.get()[0]
                 debug(self_cover = self.cover)
                 debug(cover_split = self.cover.split(os.path.sep)[-1])
                 if not self.cover or self.cover.split(os.path.sep)[-1] == 'no-cover.png': self.FAIL_LAST_FM = True
