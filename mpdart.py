@@ -677,7 +677,7 @@ class MPD(object):
                 except Exception as e:
                     logger.warning("get cover from cover server [ERROR]: {}".format(e))
                     debug(nt = nt)
-                if not nt >= self.CONFIG.get_config('cover_server', 'tries', '3') or 3:
+                if not nt > (self.CONFIG.get_config('cover_server', 'tries', '3') or 3):
                     nt += 1
                 else:
                     r = None
