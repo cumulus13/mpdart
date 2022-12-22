@@ -183,6 +183,7 @@ class MPD(object):
             #if not self.first:
                 #print(traceback.format_exc())
             logger.error(e)
+            time.sleep(1)
             try:
                 c = MPDClient()
                 c.connect(host, port, timeout)
@@ -201,6 +202,7 @@ class MPD(object):
                         logger.error(traceback.format_exc())
                     self.first = True
             #self.first = True
+                time.sleep(1)
         self.command = func
         return {}
 
@@ -818,7 +820,7 @@ class MPD(object):
         parser.add_argument('--mpd-host', help = 'MPD Server host, default = "127.0.0.1"', action = 'store', default = '127.0.0.1')
         parser.add_argument('--mpd-port', help = 'MPD Server port, default = "6600"', action = 'store', type = int, default = 6600)
         parser.add_argument('-t', '--sleep', help = 'Time interval, default = 1 second', dest = 'second', action = 'store', type = int, default = 1)
-        parser.add_argument('-r', '--repeat-to', help = 'Repeat to number or jump after song to track playlist number, format: N1,N2 , N1 = from N2 to, if song get N1 then song will jump to N2', action = 'store', nargs = 2)
+        parser.add_argument('-r', '--repeat-to', help = 'Repeat to number or jump after song to track playlist number, format: N1,N2 , N1 = from N2 to, if song get N1 then song will jump to N2, if N1 = ?|#|. N1 will set as curret number/pos, "c" for N1/N2 clear repeat/jump', action = 'store', nargs = 2)
         if len(sys.argv) == 1:
             parser.print_help()
         else:
@@ -848,10 +850,20 @@ class MPD(object):
             #c = MPDArt(args.mpd_host, args.mpd_port, args.second, music_dir = args.music_dir)
             if args.repeat_to:
                 fr, to = args.repeat_to
+                logger.warning("get jump from: {}".format(fr))
+                logger.warning("get jump to  : {}".format(to))                                
+                if fr == '.' or fr == "#" or fr == "?":
+                    self.current_song = self.current_song or self.conn('currentsong')
+                    fr = self.current_song.get('id')
+                logger.warning("set jump from: {}".format(fr))
+                logger.warning("set jump to  : {}".format(to))                
                 if str(fr).isdigit() and str(to).isdigit():
                     self.CONFIG.write_config('repeat', 'jump', "{},{}".format(fr, to))
                     self.jump_from = fr
-                    self.jumo_to = to
+                    self.jump_to = to
+                elif fr == 'c' and to == 'c':
+                    self.CONFIG.write_config('repeat', 'jump', '')
+                    
             if args.cover_server:
                 self.cover_server(args.cover_server_host, args.cover_server_port)
             else:
@@ -987,6 +999,8 @@ class Art(QDialog):
         if jump and "," in  jump:
             try:
                 jump_from, jump_to = list(filter(None, [i.strip() for i in re.split(",|\n", jump)]))
+                if jump_from == '.' or jump_from == "#" or jump_from == "?":
+                    jump_from = self.current_song.get('id')
                 logger.warning("jump from: {}".format(jump_from))
                 logger.warning("jump to: {}".format(jump_to))
             except:
@@ -998,9 +1012,11 @@ class Art(QDialog):
             if jump_from == self.current_song.get('pos'):                        
                 try:
                     MPD.CONN.play(str(int(jump_to) - 1))
+                    #MPD.CONFIG.write_config('repeat', 'jump', '')
                 except:
                     try:
                         MPD.conn('play', (jump_to, ))
+                        #MPD.CONFIG.write_config('repeat', 'jump', '')
                     except:
                         traceback.format_exc()
                         
