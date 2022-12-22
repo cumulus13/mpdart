@@ -124,13 +124,19 @@ class MPD(object):
     port = CONFIG.get_config('mpd', 'port') or os.getenv('MPD_PORT') or 6600
     music_dir = CONFIG.get_config('mpd', 'music_dir')
     
+    jump_from = None
+    jump_to = None
+    
     sleep = CONFIG.get_config('sleep', 'time') or 1000
     icon = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'icon.png')
     timeout = CONFIG.get_config('mpd', 'timeout')
     CONN = MPDClient()
     debug(host = host)
     debug(port = port)
-    CONN.connect(host, port)
+    try:
+        CONN.connect(host, port)
+    except:
+        pass
     
     DEFAULT_COVER = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'no-cover.png')
     current_song = {}    
@@ -812,6 +818,7 @@ class MPD(object):
         parser.add_argument('--mpd-host', help = 'MPD Server host, default = "127.0.0.1"', action = 'store', default = '127.0.0.1')
         parser.add_argument('--mpd-port', help = 'MPD Server port, default = "6600"', action = 'store', type = int, default = 6600)
         parser.add_argument('-t', '--sleep', help = 'Time interval, default = 1 second', dest = 'second', action = 'store', type = int, default = 1)
+        parser.add_argument('-r', '--repeat-to', help = 'Repeat to number or jump after song to track playlist number, format: N1,N2 , N1 = from N2 to, if song get N1 then song will jump to N2', action = 'store', nargs = 2)
         if len(sys.argv) == 1:
             parser.print_help()
         else:
@@ -839,6 +846,12 @@ class MPD(object):
 
             #app = QApplication(sys.argv)
             #c = MPDArt(args.mpd_host, args.mpd_port, args.second, music_dir = args.music_dir)
+            if args.repeat_to:
+                fr, to = args.repeat_to
+                if str(fr).isdigit() and str(to).isdigit():
+                    self.CONFIG.write_config('repeat', 'jump', "{},{}".format(fr, to))
+                    self.jump_from = fr
+                    self.jumo_to = to
             if args.cover_server:
                 self.cover_server(args.cover_server_host, args.cover_server_port)
             else:
@@ -966,6 +979,31 @@ class Art(QDialog):
         
         #self.showData()
         
+    def jump(self):
+        jump = MPD.CONFIG.get_config('repeat', 'jump')
+        logger.warning("config jump: {}".format(jump))
+        jump_from = ''
+        jump_to = ''
+        if jump and "," in  jump:
+            try:
+                jump_from, jump_to = list(filter(None, [i.strip() for i in re.split(",|\n", jump)]))
+                logger.warning("jump from: {}".format(jump_from))
+                logger.warning("jump to: {}".format(jump_to))
+            except:
+                traceback.format_exc()
+        if jump_from and jump_to:
+            logger.warning("jump from: {}".format(jump_from))
+            logger.warning("jump to: {}".format(jump_to))
+            logger.warning("current song pos: {}".format(self.current_song.get('id')))
+            if jump_from == self.current_song.get('pos'):                        
+                try:
+                    MPD.CONN.play(jump_to)
+                except:
+                    try:
+                        MPD.conn('play', (jump_to, ))
+                    except:
+                        traceback.format_exc()
+                        
     def showData(self):
         logger.debug("self_current_song: {}".format(self.current_song))
         logger.debug("self_current_state: {}".format(self.current_state))
@@ -1025,6 +1063,7 @@ class Art(QDialog):
                             MPD.send_notify(self.current_song, self.current_state, self.current_state.get('state'), cover_art=self.cover,)
                 #else:
                 elif float(self.current) >= float(self.total) or not self.last_song == self.current_song.get('file'):
+                    self.jump()
                     logger.warning('prepare next song')
                     time.sleep(1)
                     self._showData(self.host, self.port, self.timeout, False)
@@ -1091,12 +1130,15 @@ class Art(QDialog):
                 self.last_state = self.current_state.get('state')
                 self.ui.comment.setText(self.current_state.get('state'))
                 self.ui.pbar.setValue(0)
-                
+        
+        #self.jump()        
         self.current_state = MPD.conn('status')
         self.current_song = MPD.conn('currentsong')
         debug(self_current_state = self.current_state)
         debug(self_current_song = self.current_song)
+        
         if not self.current_song.get('file') == self.last_song:
+            self.jump()
             self._showData(self.host, self.port, self.timeout, False, self.current_song, self.current_state)
             self.cover = self.set_cover(refresh = True)
             MPD.send_notify(self.current_song, self.current_state, self.current_state.get('state'), cover_art=self.cover,)
