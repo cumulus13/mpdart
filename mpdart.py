@@ -934,7 +934,8 @@ class Art(QDialog):
         #QDialog.__init__(self, None, QtCore.Qt.WindowStaysOnTopHint)
         
         self.ui = Ui_mpdart()
-        self.ui.setupUi(self)        
+        self.ui.setupUi(self)
+        self.setMouseTracking(True)
         self.setShortcut()
         
         self.installEventFilter(self)
@@ -982,6 +983,7 @@ class Art(QDialog):
         self.change_color()
         self.change_opacity()
         self.change_title_bar()
+        self.setPositionbylast()
         
         #fi = self.ui.artist.fontInfo()
         #print("font artist:", fi.pointSize())
@@ -990,6 +992,44 @@ class Art(QDialog):
         self.timer_bar = QTimer(self)
         
         #self.showData()
+        
+    def quit(self):
+        logger.debug("list position [1]: {}, {}".format(self.pos().x(), self.pos().y()))
+        try:
+            logger.debug("list position [2]: {}, {}".format(self.dark_view.pos().x(), self.dark_view.pos().y()))
+        except:
+            pass
+        self.setLastPosition()
+        self.close()
+        
+    def setLastPosition(self):
+        try:
+            if not self.dark_view.pos().x() < 2:
+                self.CONFIG.write_config('position', 'x', self.dark_view.pos().x())
+                self.CONFIG.write_config('position', 'y', self.dark_view.pos().y())
+            else:
+                self.CONFIG.write_config('position', 'x', self.geometry().x())
+                self.CONFIG.write_config('position', 'y', self.geometry().y())
+        except:
+            traceback.format_exc()
+            self.CONFIG.write_config('position', 'x', self.geometry().x())
+            self.CONFIG.write_config('position', 'y', self.geometry().y())
+            
+    def setPositionbylast(self):
+        x = self.CONFIG.get_config('position', 'x')
+        y = self.CONFIG.get_config('position', 'y')
+        if x or y:
+            if x > 1 or y > 1:
+                self.setGeometry(QRect(x, y, self.geometry().width(), self.geometry().height()))
+                try:
+                    self.setGeometry(QRect(x, y, self.dark_view.geometry().width(), self.dark_view.geometry().height()))
+                except:
+                    pass
+    #def mouseMoveEvent(self, e):
+        #print("pos:", e.x(), e.y())
+        
+    #def mousePressEvent(self, e):
+        #print("pos:", e.x(), e.y())    
         
     def jump(self):
         jump = MPD.CONFIG.get_config('repeat', 'jump')
@@ -1488,20 +1528,20 @@ class Art(QDialog):
         
     def setShortcut(self):
         self.quit_shortcut = QShortcut(QKeySequence("esc"), self)
-        self.quit_shortcut.activated.connect(self.close)
+        self.quit_shortcut.activated.connect(self.quit)
         
         #try:
             #self.dark_view.quit_shortcut = QShortcut(QKeySequence("esc"), self)
-            #self.dark_view.quit_shortcut.activated.connect(self.close)
+            #self.dark_view.quit_shortcut.activated.connect(self.quit)
         #except:
             #pass
 
         self.quit_shortcut = QShortcut(QKeySequence("q"), self)
-        self.quit_shortcut.activated.connect(self.close)
+        self.quit_shortcut.activated.connect(self.quit)
         
         #try:
             #self.dark_view.quit_shortcut = QShortcut(QKeySequence("q"), self)
-            #self.dark_view.quit_shortcut.activated.connect(self.close)
+            #self.dark_view.quit_shortcut.activated.connect(self.quit)
         #except:
             #pass
         
@@ -1524,6 +1564,7 @@ class Art(QDialog):
             #pass
 
     def eventFilter(self, obj, event):
+        #print("event.type():", event.type())
         # if (event.type() == QtCore.QEvent.Resize):
                 # print( 'Inside event Filter')
         return super().eventFilter(obj, event)
