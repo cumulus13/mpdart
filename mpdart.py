@@ -997,7 +997,7 @@ class Art(QDialog):
             logger.warning("current song pos: {}".format(self.current_song.get('id')))
             if jump_from == self.current_song.get('pos'):                        
                 try:
-                    MPD.CONN.play(jump_to)
+                    MPD.CONN.play(str(int(jump_to) - 1))
                 except:
                     try:
                         MPD.conn('play', (jump_to, ))
