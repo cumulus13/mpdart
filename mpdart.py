@@ -1113,6 +1113,17 @@ class Art(QDialog):
                 self.last_state = self.current_state.get('state')
                 self.ui.comment.setText(self.current_state.get('state'))
                 self.ui.pbar.setValue(0)
+            elif float(self.current) >= float(self.total) or not self.last_song == self.current_song.get('file'):
+                self.jump()
+                logger.warning('prepare next song')
+                time.sleep(1)
+                self._showData(self.host, self.port, self.timeout, False)
+                self.cover = self.set_cover(refresh = True)
+                MPD.send_notify(self.current_song, self.current_state, self.current_state.get('state'), cover_art=self.cover,)
+                #if self.current_song and self.current_state:
+                logger.warning('play next song')
+                self.last_song = self.current_song.get('file')
+                self.last_state = self.current_state.get('state')
             else:
                 if not self.last_state == self.current_state.get('state') or not self.last_song == self.current_song.get('file'):
                     logger.warning('{} --> {}'.format(self.last_state, self.current_state.get('state')))
