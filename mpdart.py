@@ -1554,8 +1554,14 @@ class Art(QDialog):
         #except:
             #pass
         
-        self.next_shortcut = QShortcut(QKeySequence("p"), self)
+        self.next_shortcut = QShortcut(QKeySequence("r"), self)
         self.next_shortcut.activated.connect(self.play_prev)
+        
+        self.next_shortcut = QShortcut(QKeySequence("P"), self)
+        self.next_shortcut.activated.connect(self.play_pause)
+        
+        self.next_shortcut = QShortcut(QKeySequence("p"), self)
+        self.next_shortcut.activated.connect(self.play_pause)                
         
         #try:
             #self.dark_view.next_shortcut = QShortcut(QKeySequence("p"), self)
@@ -1636,6 +1642,10 @@ class Art(QDialog):
             #debug(ip = ip)
         #return ip[0]
         
+    def play_pause(self):
+        MPD.conn('pause')
+    def play_play(self):
+        MPD.conn('play')    
     def setToolTip(self):
         self.ui.read_bt.setToolTip('<b>r</b>')
         self.ui.unread_bt.setToolTip('<b>u</b>')
