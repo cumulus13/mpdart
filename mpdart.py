@@ -111,17 +111,21 @@ ch.setLevel(logging.DEBUG)
 ch.setFormatter(CustomFormatter())
 logger.addHandler(ch)
 
-MPD_HOST = '127.0.0.1'
+MPD_HOST = ''
 MPD_PORT = 6600
 MPD_MUSIC_DIR = '' 
 MPD_SLEEP = 1
 APP = 'MPD-Art'
+CONFIGFILE = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mpdart.ini')
+CONFIG = configset(CONFIGFILE)
 MOD_MASK = (Qt.CTRL | Qt.ALT | Qt.SHIFT | Qt.META)
 
 class MPD(object):
-    CONFIG = configset()
-    host = CONFIG.get_config('mpd', 'host') or os.getenv('MPD_HOST') or '127.0.0.1'
-    port = CONFIG.get_config('mpd', 'port') or os.getenv('MPD_PORT') or 6600
+    CONFIG = CONFIG
+    host = CONFIG.get_config('mpd', 'host') or MPD_HOST or os.getenv('MPD_HOST') or '127.0.0.1'
+    port = CONFIG.get_config('mpd', 'port') or MPD_PORT or os.getenv('MPD_PORT') or 6600
+    debug(host = host)
+    debug(port = port)
     music_dir = CONFIG.get_config('mpd', 'music_dir')
     
     jump_from = None
@@ -133,10 +137,10 @@ class MPD(object):
     CONN = MPDClient()
     debug(host = host)
     debug(port = port)
-    try:
-        CONN.connect(host, port)
-    except:
-        pass
+    #try:
+        #CONN.connect(host, port)
+    #except:
+        #pass
     
     DEFAULT_COVER = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'no-cover.png')
     current_song = {}    
@@ -146,16 +150,24 @@ class MPD(object):
     first = False
     process = None
     process1 = None
+    first_current_song = False
+    first_state = False
     
     @classmethod
     def conn(self, func, args = (), host = None, port = None, refresh = False, repeat = False):
         if host and not host == self.host or port and not port == self.port:
+            debug(host = host)
+            debug(port = port)            
             self.CONN.connect(host, port, self.timeout)
             self.host = host
             self.port = port
         else:
             host = host or self.host or '127.0.0.1'
             port = port or self.port or 6600
+            try:
+                self.CONN.connect(host, port, self.timeout)
+            except:
+                pass
         timeout = self.timeout or self.CONFIG.get_config('mpd', 'timeout') or None
         debug(host = host)
         debug(port = port)
@@ -810,94 +822,6 @@ class MPD(object):
         except:
             logging.error(traceback.format_exc())
 
-    @classmethod
-    def usage(self):
-        parser = argparse.ArgumentParser('mpdart', epilog = make_colors('MPD Client info + Art', 'ly'))
-        parser.add_argument('-s', '--cover-server', help = 'Run cover server',  action = 'store_true')
-        parser.add_argument('-S', '--cover-server-host', help = 'Listen cover server on, default = "0.0.0.0"', action = 'store')
-        parser.add_argument('-P', '--cover-server-port', help = 'Listen cover server on port, default = "8800"', action = 'store', type = int)
-        parser.add_argument('-p', '--music-dir', help = 'Music dir from config file', action = 'store')
-        parser.add_argument('--mpd-host', help = 'MPD Server host, default = "127.0.0.1"', action = 'store', default = '127.0.0.1')
-        parser.add_argument('--mpd-port', help = 'MPD Server port, default = "6600"', action = 'store', type = int, default = 6600)
-        parser.add_argument('-t', '--sleep', help = 'Time interval, default = 1 second', dest = 'second', action = 'store', type = int, default = 1)
-        parser.add_argument('-r', '--repeat-to', help = 'Repeat to number or jump after song to track playlist number, format: N1,N2 , N1 = from N2 to, if song get N1 then song will jump to N2, if N1 = ?|#|. N1 will set as curret number/pos, "c" for N1/N2 clear repeat/jump', action = 'store', nargs = 2)
-        if len(sys.argv) == 1:
-            parser.print_help()
-        else:
-            global MPD_HOST
-            global MPD_PORT
-            global MPD_MUSIC_DIR
-            global MPD_SLEEP
-            global APP
-            args = parser.parse_args()
-            self.host = args.mpd_host or os.getenv('MPD_HOST') or self.host
-            self.port = args.mpd_port or os.getenv('MPD_PORT') or self.port
-            debug(args_music_dir = args.music_dir)
-
-            MPD_HOST = self.host
-            MPD_PORT = self.port
-            MPD_MUSIC_DIR = args.music_dir
-            MPD_SLEEP = self.sleep or 1000
-            if args.second:
-                MPD_SLEEP = (args.second * 1000) or MPD_SLEEP
-
-            debug(MPD_HOST = MPD_HOST)
-            debug(MPD_PORT = MPD_PORT)
-            debug(MPD_MUSIC_DIR = MPD_MUSIC_DIR)
-            debug(MPD_SLEEP = MPD_SLEEP)    
-
-            #app = QApplication(sys.argv)
-            #c = MPDArt(args.mpd_host, args.mpd_port, args.second, music_dir = args.music_dir)
-            if args.repeat_to:
-                fr, to = args.repeat_to
-                logger.warning("get jump from: {}".format(fr))
-                logger.warning("get jump to  : {}".format(to))                                
-                if fr == '.' or fr == "#" or fr == "?":
-                    self.current_song = self.current_song or self.conn('currentsong')
-                    fr = self.current_song.get('id')
-                logger.warning("set jump from: {}".format(fr))
-                logger.warning("set jump to  : {}".format(to))                
-                if str(fr).isdigit() and str(to).isdigit():
-                    self.CONFIG.write_config('repeat', 'jump', "{},{}".format(fr, to))
-                    self.jump_from = fr
-                    self.jump_to = to
-                elif fr == 'c' and to == 'c':
-                    self.CONFIG.write_config('repeat', 'jump', '')
-                    
-            if args.cover_server:
-                self.cover_server(args.cover_server_host, args.cover_server_port)
-            else:
-                if args.music_dir:
-                    app = QApplication(sys.argv)
-                    View = Art(MPD_HOST, MPD_PORT, MPD_SLEEP, None, self.icon, MPD_MUSIC_DIR)
-                    
-                    #apply_stylesheet(app, theme = 'dark_yellow.xml', invert_secondary = False)
-                    qtmodern.styles.dark(app)
-                    #app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-                    View.dark_view = qtmodern.windows.ModernWindow(View)
-                    View.dark_view.setMaximumSize(View.maximumSize())
-                    View.dark_view.setMaximumHeight(View.maximumHeight())
-                    View.dark_view.setMaximumWidth(View.maximumWidth())
-                    View.dark_view.setFixedSize(View.maximumWidth() + 2, View.maximumHeight() + 31)
-                    try:
-                        View.installEventFilter(View.dark_view)
-                    except:
-                        pass
-                    if self.CONFIG.get_config('title', 'bar'):
-                        try:
-                            View.dark_view.setWindowFlag(Qt.FramelessWindowHint)
-                        except:
-                            #print(traceback.format_exc())
-                            logger.error(traceback.format_exc())
-                    #self.dark_view.setWindowTitle()
-                    logger.warning('showing ....')
-                    View.dark_view.show()
-                    View.show()
-                    View.showData()
-                    app.exec_()
-                    #View.showData()
-                else:
-                    logger.warning(make_colors("No Music dir !", 'lw', 'r'))    
 
 class Art(QDialog):
     keyPressed = pyqtSignal(str)
@@ -908,8 +832,6 @@ class Art(QDialog):
     music_dir = CONFIG.get_config('mpd', 'music_dir')
     configfile = CONFIG.get_config('config', 'file')
     timeout = CONFIG.get_config('mpd', 'timeout')
-    first_current_song = False
-    first_state = False
     command = None
     last_dir = None
     cover = ''
@@ -1659,12 +1581,108 @@ class Art(QDialog):
         self.ui.o_browser_bt.setToolTip('<b>o ~ open in default browser</b>')
 
     
+
+def usage():
+    parser = argparse.ArgumentParser('mpdart', epilog = make_colors('MPD Client info + Art', 'ly'))
+    parser.add_argument('-s', '--cover-server', help = 'Run cover server',  action = 'store_true')
+    parser.add_argument('-S', '--cover-server-host', help = 'Listen cover server on, default = "0.0.0.0"', action = 'store')
+    parser.add_argument('-P', '--cover-server-port', help = 'Listen cover server on port, default = "8800"', action = 'store', type = int)
+    parser.add_argument('-p', '--music-dir', help = 'Music dir from config file', action = 'store')
+    parser.add_argument('--mpd-host', help = 'MPD Server host, default = "127.0.0.1"', action = 'store')#, default = '127.0.0.1')
+    parser.add_argument('--mpd-port', help = 'MPD Server port, default = "6600"', action = 'store', type = int, default = 6600)
+    parser.add_argument('-t', '--sleep', help = 'Time interval, default = 1 second', dest = 'second', action = 'store', type = int, default = 1)
+    parser.add_argument('-r', '--repeat-to', help = 'Repeat to number or jump after song to track playlist number, format: N1,N2 , N1 = from N2 to, if song get N1 then song will jump to N2, if N1 = ?|#|. N1 will set as curret number/pos, "c" for N1/N2 clear repeat/jump', action = 'store', nargs = 2)
+    if len(sys.argv) == 1:
+        parser.print_help()
+    else:
+        #global MPD_HOST
+        #global MPD_PORT
+        #global MPD_MUSIC_DIR
+        #global MPD_SLEEP
+        #global APP
+        
+        args = parser.parse_args()
+        
+        if args.mpd_host: MPD_HOST = args.mpd_host
+        if args.mpd_port: MPD_PORT = args.mpd_port        
+        
+        MPD.host = args.mpd_host or MPD.CONFIG.get_config('mpd', 'host') or os.getenv('MPD_HOST') or MPD.host
+        MPD.port = args.mpd_port or MPD.CONFIG.get_config('mpd', 'port') or os.getenv('MPD_PORT') or MPD.port
+        
+        debug(args_music_dir = args.music_dir)
+
+        MPD_HOST = MPD.host
+        MPD_PORT = MPD.port
+        MPD_MUSIC_DIR = args.music_dir
+        MPD_SLEEP = MPD.sleep or 1000
+        if args.second: MPD_SLEEP = (args.second * 1000) or MPD_SLEEP
+
+        debug(MPD_HOST = MPD_HOST)
+        debug(MPD_PORT = MPD_PORT)
+        
+        debug(MPD_MUSIC_DIR = MPD_MUSIC_DIR)
+        debug(MPD_SLEEP = MPD_SLEEP)    
+
+        #app = QApplication(sys.argv)
+        #c = MPDArt(args.mpd_host, args.mpd_port, args.second, music_dir = args.music_dir)
+        if args.repeat_to:
+            fr, to = args.repeat_to
+            logger.warning("get jump from: {}".format(fr))
+            logger.warning("get jump to  : {}".format(to))                                
+            if fr == '.' or fr == "#" or fr == "?":
+                MPD.current_song = MPD.current_song or MPD.conn('currentsong')
+                fr = MPD.current_song.get('id')
+            logger.warning("set jump from: {}".format(fr))
+            logger.warning("set jump to  : {}".format(to))                
+            if str(fr).isdigit() and str(to).isdigit():
+                MPD.CONFIG.write_config('repeat', 'jump', "{},{}".format(fr, to))
+                MPD.jump_from = fr
+                MPD.jump_to = to
+            elif fr == 'c' and to == 'c':
+                MPD.CONFIG.write_config('repeat', 'jump', '')
+                
+        if args.cover_server:
+            MPD.cover_server(args.cover_server_host, args.cover_server_port)
+        else:
+            if args.music_dir:
+                app = QApplication(sys.argv)
+                View = Art(MPD_HOST, MPD_PORT, MPD_SLEEP, None, MPD.icon, MPD_MUSIC_DIR)
+                
+                #apply_stylesheet(app, theme = 'dark_yellow.xml', invert_secondary = False)
+                qtmodern.styles.dark(app)
+                #app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+                View.dark_view = qtmodern.windows.ModernWindow(View)
+                View.dark_view.setMaximumSize(View.maximumSize())
+                View.dark_view.setMaximumHeight(View.maximumHeight())
+                View.dark_view.setMaximumWidth(View.maximumWidth())
+                View.dark_view.setFixedSize(View.maximumWidth() + 2, View.maximumHeight() + 31)
+                try:
+                    View.installEventFilter(View.dark_view)
+                except:
+                    pass
+                if MPD.CONFIG.get_config('title', 'bar'):
+                    try:
+                        View.dark_view.setWindowFlag(Qt.FramelessWindowHint)
+                    except:
+                        #print(traceback.format_exc())
+                        logger.error(traceback.format_exc())
+                #self.dark_view.setWindowTitle()
+                logger.warning('showing ....')
+                View.dark_view.show()
+                View.show()
+                View.showData()
+                app.exec_()
+                #View.showData()
+            else:
+                logger.warning(make_colors("No Music dir !", 'lw', 'r'))    
+
 if __name__ == '__main__':
     #usage()
     #app = QApplication(sys.argv)
     #c = MPDArt('192.168.0.2', 6600, 1, music_dir = r'f:\MUSICS')
     #c.get_cover()
-    MPD.usage()
+    #MPD.usage()
+    usage()
     #c.show()
     #c.cover_server()
     #app.exec_()
