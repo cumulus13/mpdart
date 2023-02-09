@@ -9,6 +9,7 @@ from netifaces import interfaces, ifaddresses, AF_INET
 from make_colors import make_colors
 from pydebugger.debug import debug
 from multiprocessing import Pool
+from progressbar import ProgressBar
 import re
 import shutil
 #import socket
@@ -121,6 +122,7 @@ CONFIG = configset(CONFIGFILE)
 MOD_MASK = (Qt.CTRL | Qt.ALT | Qt.SHIFT | Qt.META)
 
 class MPD(object):
+    cover = ''
     CONFIG = CONFIG
     host = CONFIG.get_config('mpd', 'host') or MPD_HOST or os.getenv('MPD_HOST') or '127.0.0.1'
     port = CONFIG.get_config('mpd', 'port') or MPD_PORT or os.getenv('MPD_PORT') or 6600
@@ -174,6 +176,7 @@ class MPD(object):
         debug(timeout = timeout)
         debug(refresh = refresh)
         debug(func = func)
+        logger.debug("func: {}".format(func))
 
         if refresh:
             if (func == 'currentsong' and not self.first_current_song and not self.command == func) or (func == 'status' and not self.first_state and not self.command == func):
@@ -527,32 +530,111 @@ class MPD(object):
         return file_path, img_url, thumb
 
     @classmethod
+    def get_cover_from_cover_server(self):
+        try:
+            chost = self.CONFIG.get_config('cover_server', 'host')
+            debug(chost = chost)
+            if chost == '0.0.0.0': chost = '127.0.0.1'
+            #if self.process:
+                #try:
+                    #self.process.terminate()
+                #except:
+                    #pass                
+            #self.process = Pool(processes = 1)
+            r = None
+            
+            nt = 0
+            while 1:
+                try:
+                    #r = self.process.apply_async(requests.get, args = ('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')),), kwds = {'timeout': (self.CONFIG.get_config('requests', 'timeout') or 6)})
+                    logger.warning("Get cover from cover server 'http://{}:{}'".format(chost, str(self.CONFIG.get_config('cover_server', 'port'))))
+                    r = requests.get(
+                        'http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')),
+                        timeout = (self.CONFIG.get_config('requests', 'timeout') or 6)
+                    )
+                except Exception as e:
+                    if os.getenv('TRACEBACK') == '1' or os.getenv('TRACEBACK') == 1:
+                        logger.warning("get cover from cover server [ERROR]: {}".format(e))
+                    else:
+                        logger.warning("get cover from cover server [ERROR]")
+                try:
+                    logger.warning("get cover from cover server")
+                    #if r.get():
+                    if r:
+                        logger.warning("get cover from cover server [FINISH]")
+                        break
+                except Exception as e:
+                    if os.getenv('TRACEBACK') == '1' or os.getenv('TRACEBACK') == 1:
+                        logger.warning("get cover from cover server [ERROR]: {}".format(e))
+                    else:
+                        logger.warning("get cover from cover server [ERROR]")
+                    debug(nt = nt)
+                if not nt > (self.CONFIG.get_config('cover_server', 'tries', '3') or 3):
+                    nt += 1
+                else:
+                    r = None
+                    break
+                    
+            #r = requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')), timeout = (self.CONFIG.get_config('requests', 'timeout') or 5))
+            if r:
+                #ext = r.get().headers.get('Content-type') or r.get().headers.get('content-type')
+                ext = r.headers.get('Content-type') or r.headers.get('content-type')
+                logger.debug("ext: {}".format(ext))
+                if ext:
+                    if "image" in ext: logger.warning("get cover from cover server [SUCCESS]")
+                if ext: ext = mimelist.get(ext) or "jpg"
+                logger.debug("ext: {}".format(ext))
+                try:
+                    if not os.path.isdir(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'))):
+                        os.makedirs(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown')))
+                    with open(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext), 'wb') as fc:
+                        try:
+                            logger.warning("get cover from cover server, write file")
+                            #fc.write(r.get().content)
+                            fc.write(r.content)
+                            logger.warning("get cover from cover server, write file [FINISH]")
+                            logger.info("get cover from cover server: cover: '{}'".format(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext)))
+                        except Exception as e:
+                            logger.error("Failed to make file, get cover from cover server [FAILED 0]")
+                            if os.getenv('TRACEBACK') == '1' or os.getenv('TRACEBACK') == 1:
+                                logger.error(e)
+                except Exception as e:
+                    logger.error("Failed to make file, get cover from cover server [FAILED 1]")
+                    if os.getenv('TRACEBACK') == '1' or os.getenv('TRACEBACK') == 1:
+                        logger.error(e)                 
+            else:
+                logger.error("Failed to get cover from cover server [FAILED]")
+            logger.warning("get cover from cover server, check is file")
+            if MPD.check_is_image(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext)):
+                self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext)
+                debug(self_cover = self.cover)
+                logger.warning("cover is file [7]")
+                return self.cover
+            else:
+                logger.error("Failed to make file, get cover from cover server [FAILED 2]")
+        except Exception as e:
+            logger.error(e)
+            if os.getenv('TRACEBACK') == '1' or os.getenv('TRACEBACK') == 1: logger.error(traceback.format_exc())
+        return False
+                
+    @classmethod
     def get_cover(self, current_song, music_dir = None, get_lastfm_cover = True, refresh = False):
+        if refresh: self.cover = ''
+        
         current_song = current_song or self.conn('currentsong')
-        if current_song.get('file') == self.current_song.get('file'):
-            self.current_song = current_song
+        if current_song.get('file') == self.current_song.get('file'): self.current_song = current_song
+        logger.info("self.current_song: {}".format(self.current_song))
         debug(music_dir = music_dir)
         music_dir = music_dir or MPD_MUSIC_DIR or self.music_dir
         debug(music_dir = music_dir)
         debug(current_song = current_song)
-        logger.debug("current_song: {}".format(current_song))
-        #sys.exit()
-        
-        if os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg") or os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png"):
-            self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg") or os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png")
-            debug(self_cover = self.cover)
-            if MPD.check_is_image(self.cover):
-                debug(self_cover = self.cover)
-                logger.warning("cover is file [1]")
-                return os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg") or os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png")
-        debug('No cover')
-        
         if sys.platform == 'win32':
             sep = "\\"
         else:
             sep = "/"
         
-        logger.warning("get cover from song file")
+        ############################ [start] get cover from mpd tag #############################################
+        logger.debug("get cover from mpd tag")
         debug(file = current_song.get('file'))
         img_data = self.conn('albumart', (current_song.get('file'), ))
         ext = 'jpg'
@@ -560,26 +642,58 @@ class MPD(object):
         debug(img_data = len(img_data))
         
         if img_data and current_song:
-            logger.warning("img_data is exists")
+            logger.debug("get cover from mpd tag, img_data is exists")
             img = Image.open(io.BytesIO(img_data))
             debug(check_ext = mimelist.get2(img.format))
             ext = mimelist.get2(img.format)[1]
             if not os.path.isdir(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'))):
                 os.makedirs(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown')))
-            img.save(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext))
+            try:
+                img.save(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext))
+            except Exception as e:
+                logger.error("get cover from mpd tag, Error save imgdata")
+                if os.getenv('TRACEBACK') == '1' or os.getenv('TRACEBACK') == 1: logger.error("get cover from mpd tag, Error save imgdata: {}".format(str(traceback.format_exc())))
             
         if os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)):
             if MPD.check_is_image(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)):
                 self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)
                 debug(self_cover_X = self.cover)
-                logger.warning("cover is file [2]")
+                logger.warning("get cover from mpd tag, cover is file [2]")
+                logger.debug("self.cover: {}".format(self.cover))
                 return os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + "." +  ext)
         debug(refresh = refresh)
         debug(self_cover = self.cover)
         debug(check_cover = MPD.check_is_image(self.cover))
         
-        if refresh: self.cover = ''
+        ############################ [end] get cover from mpd tag #############################################
+        
+        ############################# [start] get cover by name [.jpg|.png] #####################################
+        logger.debug("get cover by name [.jpg|.png]")
+        if os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg")):
+            self.cover = self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".jpg")
+        elif os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png")):
+            self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover' + ".png")
+        elif os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Cover' + ".jpg")):
+            self.cover = self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Cover' + ".jpg")
+        elif os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Cover' + ".png")):
+            self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Cover' + ".png")
+        elif os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'folder' + ".jpg")):
+            self.cover = self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'folder' + ".jpg")
+        elif os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'folder' + ".png")):
+            self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'folder' + ".png")
+        elif os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Folder' + ".jpg")):
+            self.cover = self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Folder' + ".jpg")
+        elif os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Folder' + ".png")):
+            self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'Folder' + ".png")        
         debug(self_cover = self.cover)
+        if MPD.check_is_image(self.cover):
+            debug(self_cover = self.cover)
+            logger.warning("cover is file [1]")
+            logger.debug("[SUCCESS] get cover by name [.jpg|.png]")
+            logger.debug("self.cover: {}".format(self.cover))
+            return self.cover
+
+        debug('No cover')
         
         if not MPD.check_is_image(self.cover) and current_song.get('file'):
             #if not os.path.isfile(self.cover):
@@ -588,27 +702,34 @@ class MPD(object):
             else:
                 self.cover = os.path.join(music_dir, os.path.splitext(current_song.get('file'))[0]) + '.jpg'
             debug(self_cover = self.cover)
+            if MPD.check_is_image(self.cover):
+                logger.warning("get cover by name [.jpg|.png], cover is file [2]")
+                logger.debug("self.cover: {}".format(self.cover))
+                return self.cover                    
         if not MPD.check_is_image(self.cover) and current_song.get('file'):
             if sys.platform == 'win32':
                 self.cover = os.path.join(music_dir, sep.join(os.path.splitext(current_song.get('file'))[0].split("/")[1:])) + '.png'
             else:
                 self.cover = os.path.join(music_dir, os.path.splitext(current_song.get('file'))[0]) + '.png'
             debug(self_cover = self.cover)
-            #if os.path.isfile(self.cover):
             if MPD.check_is_image(self.cover):
-                logger.warning("cover is file [3]")
+                logger.warning("get cover by name [.jpg|.png], cover is file [3]")
+                logger.debug("self.cover: {}".format(self.cover))
                 return self.cover        
         if not MPD.check_is_image(self.cover) and current_song.get('file'):
             cover_file = os.path.join(music_dir, sep.join(current_song.get('file').split("/")[1:]))
             debug(cover_file = cover_file)
             try:
-                logger.warning("get cover from tag file")
                 self.cover = MPD.get_cover_tag(cover_file)
+                if MPD.check_is_image(cover_file):
+                    logger.warning("get cover by name [.jpg|.png], cover is file [4]")
+                    logger.debug("self.cover: {}".format(self.cover))
+                    return self.cover                        
             except:
                 pass
-        if MPD.check_is_image(self.cover):
-            logger.warning("cover is file [4]")
-            return self.cover
+        #if MPD.check_is_image(self.cover):
+            #logger.warning("cover is file [4]")
+            #return self.cover
         debug(self_cover = self.cover)
         valid_cover = list(filter(None, [i.strip() for i in re.split(",|\n|\t", self.CONFIG.get_config('cover', 'valid'))])) or ['cover.jpg', 'cover2.jpg', 'cover.png', 'cover2.png', 'folder.jpg', 'folder.png', 'front.jpg', 'front.png', 'albumart.jpg', 'albumart.png', 'folder1.jpg', 'folder1.png', 'back.jpg', 'back.png']
         
@@ -641,106 +762,46 @@ class MPD(object):
             if MPD.check_is_image(self.cover):
                 #print('return 3.....')
                 debug(self_cover = self.cover)
-                #sys.exit()
-                cover_dir = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'))
-                debug(cover_dir = cover_dir)
-                if not os.path.isdir(cover_dir):
-                    try:
-                        os.makedirs(cover_dir)
-                    except NotADirectoryError:
-                        logger.error("NotADirectoryError: '{}'".format(cover_dir))
-                        cover_dir = self.COVER_TEMP_DIR
-                        if not os.path.isdir(cover_dir):
-                            os.makedirs(cover_dir)
-                try:
-                    shutil.copy2(self.cover, cover_dir)
-                    self.cover = os.path.join(cover_dir, os.path.basename(self.cover))
-                    debug(self_cover = self.cover)
-                except Exception as e:
-                    #print(make_colors("shutil:", 'lw', 'r') + " " + make_colors(str(e), 'lw', 'bl'))
-                    logger.error(e)
-                    if os.getenv('TRACEBACK'):
-                        #print(traceback.format_exc())
-                        logger.error(traceback.format_exc())
-                logger.warning("cover is file [5]")
+                logger.debug("self.cover: {}".format(self.cover))
                 return self.cover
+
+                #cover_dir = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'))
+                #debug(cover_dir = cover_dir)
+                #if not os.path.isdir(cover_dir):
+                    #try:
+                        #os.makedirs(cover_dir)
+                    #except NotADirectoryError:
+                        #logger.error("NotADirectoryError: '{}'".format(cover_dir))
+                        #cover_dir = self.COVER_TEMP_DIR
+                        #if not os.path.isdir(cover_dir):
+                            #os.makedirs(cover_dir)
+                #try:
+                    #shutil.copy2(self.cover, cover_dir)
+                    #self.cover = os.path.join(cover_dir, os.path.basename(self.cover))
+                    #debug(self_cover = self.cover)
+                #except Exception as e:
+                    # #print(make_colors("shutil:", 'lw', 'r') + " " + make_colors(str(e), 'lw', 'bl'))
+                    #logger.error(e)
+                    #if os.getenv('TRACEBACK'):
+                        # #print(traceback.format_exc())
+                        #logger.error(traceback.format_exc())
+                #logger.warning("cover is file [5]")
+                #return self.cover
             else:
                 self.cover: self.cover = ''
-        #sys.exit()
-        if self.cover and MPD.check_is_image(self.cover):
-            debug(self_cover = self.cover)
-            logger.warning("cover is file [6]")
-            return self.cover
-        try:
-            chost = self.CONFIG.get_config('cover_server', 'host')
-            debug(chost = chost)
-            if chost == '0.0.0.0': chost = '127.0.0.1'
-            if self.process:
-                try:
-                    self.process.terminate()
-                except:
-                    pass                
-            self.process = Pool(processes = 1)
-            r = None
-            
-            nt = 0
-            while 1:
-                try:
-                    r = self.process.apply_async(requests.get, args = ('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')),), kwds = {'timeout': (self.CONFIG.get_config('requests', 'timeout') or 6)})
-                except Exception as e:
-                    logger.warning("get cover from cover server [ERROR]: {}".format(e))                
-                try:
-                    logger.warning("get cover from cover server")
-                    if r.get():
-                        logger.warning("get cover from cover server [FINISH]")
-                        break
-                except Exception as e:
-                    logger.warning("get cover from cover server [ERROR]: {}".format(e))
-                    debug(nt = nt)
-                if not nt > (self.CONFIG.get_config('cover_server', 'tries', '3') or 3):
-                    nt += 1
-                else:
-                    r = None
-                    break
-                    
-            #r = requests.get('http://' + chost + ":" + str(self.CONFIG.get_config('cover_server', 'port')), timeout = (self.CONFIG.get_config('requests', 'timeout') or 5))
-            if r:
-                ext = r.get().headers.get('Content-type') or r.get().headers.get('content-type')
-                logger.debug("ext: {}".format(ext))
-                if ext:
-                    if "image" in ext: logger.warning("get cover from cover server [SUCCESS]")
-                if ext: ext = mimelist.get(ext) or "jpg"
-                logger.debug("ext: {}".format(ext))
-                try:
-                    if not os.path.isfile(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'))):
-                        os.makedirs(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown')))
-                    with open(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext), 'wb') as fc:
-                        try:
-                            logger.warning("get cover from cover server, write file")
-                            fc.write(r.get().content)
-                            logger.warning("get cover from cover server, write file [FINISH]")
-                            logger.info("get cover from cover server: cover: '{}'".format(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext)))
-                        except Exception as e:
-                            logger.error("Failed to make file, get cover from cover server [FAILED 0]")
-                            logger.error(e)
-                except Exception as e:
-                    logger.error("Failed to make file, get cover from cover server [FAILED 1]")
-                    logger.error(e)                    
-            else:
-                logger.error("Failed to get cover from cover server [FAILED]")
-            logger.warning("get cover from cover server, check is file")
-            if MPD.check_is_image(os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext)):
-                self.cover = os.path.join(self.COVER_TEMP_DIR, (current_song.get('artist') or 'unknown'), (current_song.get('album') or 'unknown'), 'cover.' + ext)
-                debug(self_cover = self.cover)
-                logger.warning("cover is file [7]")
-                return self.cover
-            else:
-                logger.error("Failed to make file, get cover from cover server [FAILED 2]")
-        except Exception as e:
-            logger.error(e)
-            if os.getenv('TRACEBACK'): logger.error(traceback.format_exc())
+
+        #if self.cover and MPD.check_is_image(self.cover):
+            #debug(self_cover = self.cover)
+            #logger.warning("cover is file [6]")
+            #return self.cover
+        ############################# [end] get cover by name [.jpg|.png] #####################################
         
-        if get_lastfm_cover:
+        ########################### get cover from cover server ##########################
+        self.cover = self.get_cover_from_cover_server()
+        if self.cover:
+            if not MPD.check_is_image(self.cover): self.cover = False
+        ############################ get cover from lastfm ######################################
+        if get_lastfm_cover and not self.cover:
             logger.warning("get cover from LAST.FM")
             debug(self_FAIL_LAST_FM = self.FAIL_LAST_FM)
             if not self.FAIL_LAST_FM:
@@ -846,6 +907,10 @@ class Art(QDialog):
     last_song = ''
     current = 1
     total = 1
+    
+    PREFIX = '{variables.task} >> {variables.subtask} '
+    VARIABLES = {'task': '--', 'subtask': '--',}
+    BAR = ProgressBar(max_value = 100, max_error = False, prefix = PREFIX, variables = VARIABLES)
 
     def __init__(self, host = None, port = None, sleep = None, configfile = None, icon = None, music_dir = None):
         
@@ -983,16 +1048,16 @@ class Art(QDialog):
                         traceback.format_exc()
                         
     def showData(self):
-        logger.debug("self_current_song: {}".format(self.current_song))
-        logger.debug("self_current_state: {}".format(self.current_state))
+        logger.debug("self_current_song: " + str(self.current_song))
+        logger.debug("self_current_state: " + str(self.current_state))
         
         if not self.current_song and not self.current_state:
             debug(self_host = self.host)
             debug(self_port = self.port)
             debug(self_timeout = self.timeout)
             self._showData(self.host, self.port, self.timeout)
-            logger.debug("self_current_song: {}".format(self.current_song))
-            logger.debug("self_current_state: {}".format(self.current_state))
+            logger.debug("self_current_song: " + str(self.current_song))
+            logger.debug("self_current_state: " + str(self.current_state))
             
         if self.current_song and self.current_state:
             try:
@@ -1163,17 +1228,40 @@ class Art(QDialog):
         
         #c = self.conn(host, port)
         #current_state = self.conn(host, port).status()
-        try:
-            current_state = current_state or MPD.CONN.status()
-        except ConnectionError:
+        MAX_TRY = 10
+        nt = 0
+        task = make_colors("re-connecting to MPD_HOST -> {}".format((host or os.getenv('MPD_HOST'))), 'b', 'y')
+        self.BAR.max_value = MAX_TRY
+        while 1:
             try:
-                current_state = MPD.conn('status', host = host, port = port, refresh = True)
-                debug(current_state = current_state)
-                MPD.CONN.connect(host, port, timeout)
+                current_state = current_state or MPD.CONN.status()
+                break
+            except ConnectionError:
+                try:
+                    current_state = MPD.conn('status', host = host, port = port, refresh = True)
+                    debug(current_state = current_state)
+                    MPD.CONN.connect(host, port, timeout)
+                except mpd.base.ConnectionError:
+                    subtask = make_colors("mpd.base.ConnectionError [1]", 'lw', 'r')
+                    if nt == MAX_TRY:
+                        current_state = {}
+                        break
+                    else:
+                        nt += 1
+                        self.BAR.update(nt, task = task, subtask = subtask)
             except mpd.base.ConnectionError:
-                current_state = {}
-        except mpd.base.ConnectionError:
-            current_state = {}        
+                subtask = make_colors("mpd.base.ConnectionError [2]", 'lw', 'r')
+                if nt == MAX_TRY:
+                    current_state = {}
+                    break
+                else:
+                    nt += 1
+                    self.BAR.update(nt, task = task, subtask = subtask)
+        self.BAR.max_value = 100
+        if not current_state:
+            print(make_colors("Error connection to MPD_HOST -> {}".format((host or os.getenv('MPD_HOST'))), 'lw', 'r'))
+            os.kill(os.getpid(), signal.SIGTERM)
+            
         debug(current_state = current_state)
         try:
             current_song = current_song or MPD.CONN.currentsong()
@@ -1218,9 +1306,9 @@ class Art(QDialog):
                 pass
             
             self.ui.album.setText(
-                album + " / " + \
-                albumartist + " (" + \
-                date + ")"
+                (album or '') + " / " + \
+                (albumartist or '') + " (" + \
+                (date or '') + ")"
             )
             
             self.ui.artist.setText(
@@ -1582,17 +1670,17 @@ class Art(QDialog):
 
     
 
-def usage():
+def usage(path=None):
     parser = argparse.ArgumentParser('mpdart', epilog = make_colors('MPD Client info + Art', 'ly'))
     parser.add_argument('-s', '--cover-server', help = 'Run cover server',  action = 'store_true')
     parser.add_argument('-S', '--cover-server-host', help = 'Listen cover server on, default = "0.0.0.0"', action = 'store')
     parser.add_argument('-P', '--cover-server-port', help = 'Listen cover server on port, default = "8800"', action = 'store', type = int)
-    parser.add_argument('-p', '--music-dir', help = 'Music dir from config file', action = 'store')
+    parser.add_argument('-p', '--music-dir', help = 'Music dir from config file', action = 'store', default = path)
     parser.add_argument('--mpd-host', help = 'MPD Server host, default = "127.0.0.1"', action = 'store')#, default = '127.0.0.1')
     parser.add_argument('--mpd-port', help = 'MPD Server port, default = "6600"', action = 'store', type = int, default = 6600)
     parser.add_argument('-t', '--sleep', help = 'Time interval, default = 1 second', dest = 'second', action = 'store', type = int, default = 1)
     parser.add_argument('-r', '--repeat-to', help = 'Repeat to number or jump after song to track playlist number, format: N1,N2 , N1 = from N2 to, if song get N1 then song will jump to N2, if N1 = ?|#|. N1 will set as curret number/pos, "c" for N1/N2 clear repeat/jump', action = 'store', nargs = 2)
-    if len(sys.argv) == 1:
+    if len(sys.argv) == 1 and not path:
         parser.print_help()
     else:
         #global MPD_HOST
@@ -1614,6 +1702,7 @@ def usage():
         MPD_HOST = MPD.host
         MPD_PORT = MPD.port
         MPD_MUSIC_DIR = args.music_dir
+        print("MPD_MUSIC_DIR:", MPD_MUSIC_DIR)
         MPD_SLEEP = MPD.sleep or 1000
         if args.second: MPD_SLEEP = (args.second * 1000) or MPD_SLEEP
 
