@@ -176,7 +176,7 @@ class MPD(object):
         debug(timeout = timeout)
         debug(refresh = refresh)
         debug(func = func)
-        logger.debug("func: {}".format(func))
+        #logger.debug("func: {}".format(func))
 
         if refresh:
             if (func == 'currentsong' and not self.first_current_song and not self.command == func) or (func == 'status' and not self.first_state and not self.command == func):
@@ -530,7 +530,7 @@ class MPD(object):
         return file_path, img_url, thumb
 
     @classmethod
-    def get_cover_from_cover_server(self):
+    def get_cover_from_cover_server(self, current_song, ext):
         try:
             chost = self.CONFIG.get_config('cover_server', 'host')
             debug(chost = chost)
@@ -797,7 +797,7 @@ class MPD(object):
         ############################# [end] get cover by name [.jpg|.png] #####################################
         
         ########################### get cover from cover server ##########################
-        self.cover = self.get_cover_from_cover_server()
+        self.cover = self.get_cover_from_cover_server(current_song, ext)
         if self.cover:
             if not MPD.check_is_image(self.cover): self.cover = False
         ############################ get cover from lastfm ######################################
@@ -1232,31 +1232,39 @@ class Art(QDialog):
         nt = 0
         task = make_colors("re-connecting to MPD_HOST -> {}".format((host or os.getenv('MPD_HOST'))), 'b', 'y')
         self.BAR.max_value = MAX_TRY
+        current_state = current_state or MPD.conn('status')
+        debug(current_state = current_state, debug = 1)
         while 1:
             try:
-                current_state = current_state or MPD.CONN.status()
+                current_state = current_state or MPD.conn('status')
+                debug(current_state = current_state, debug = 1)
                 break
-            except ConnectionError:
+            except:# ConnectionError:
                 try:
                     current_state = MPD.conn('status', host = host, port = port, refresh = True)
                     debug(current_state = current_state)
                     MPD.CONN.connect(host, port, timeout)
                 except mpd.base.ConnectionError:
-                    subtask = make_colors("mpd.base.ConnectionError [1]", 'lw', 'r')
+                    #subtask = make_colors("mpd.base.ConnectionError [1]", 'lw', 'r')
+                    subtask = make_colors("mpd.base.ConnectionError", 'lw', 'r')
                     if nt == MAX_TRY:
                         current_state = {}
                         break
                     else:
                         nt += 1
                         self.BAR.update(nt, task = task, subtask = subtask)
-            except mpd.base.ConnectionError:
-                subtask = make_colors("mpd.base.ConnectionError [2]", 'lw', 'r')
-                if nt == MAX_TRY:
-                    current_state = {}
-                    break
-                else:
-                    nt += 1
-                    self.BAR.update(nt, task = task, subtask = subtask)
+                        time.sleep(1)
+            #except mpd.base.ConnectionError:
+                #subtask = make_colors("mpd.base.ConnectionError [2]", 'lw', 'r')
+                # #debug(nt = nt, debug = 1)
+                # #debug(MAX_TRY = MAX_TRY, debug = 1)
+                #if nt == MAX_TRY:
+                    #current_state = {}
+                    #break
+                #else:
+                    #nt += 1
+                    #self.BAR.update(nt, task = task, subtask = subtask)
+                    #time.sleep(1)
         self.BAR.max_value = 100
         if not current_state:
             print(make_colors("Error connection to MPD_HOST -> {}".format((host or os.getenv('MPD_HOST'))), 'lw', 'r'))
