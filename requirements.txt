@@ -12,3 +12,4 @@ qt_material
 xnotify
 python-mpd2
 mimelist
+bitmath

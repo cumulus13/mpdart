@@ -837,8 +837,9 @@ class MPD(object):
                         break
                 
                 if r1: self.cover = r1.get()[0]
-                debug(self_cover = self.cover)
-                debug(cover_split = self.cover.split(os.path.sep)[-1])
+                if self.cover:
+                    debug(self_cover = self.cover)
+                    debug(cover_split = self.cover.split(os.path.sep)[-1])
                 if not self.cover or self.cover.split(os.path.sep)[-1] == 'no-cover.png': self.FAIL_LAST_FM = True
                 debug(self_FAIL_LAST_FM = self.FAIL_LAST_FM)
         debug(self_cover = self.cover)
