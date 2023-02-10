@@ -1,0 +1,14 @@
+pydebugger
+make_colors
+netifaces
+progressbar2
+pillow
+mutagen
+requests
+argparse
+qdarkstyle
+qtmodern
+qt_material
+xnotify
+python-mpd2
+mimelist

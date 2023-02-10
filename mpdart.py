@@ -197,8 +197,9 @@ class MPD(object):
         except Exception as e:
             #if not self.first:
                 #print(traceback.format_exc())
-            logger.error(e)
-            time.sleep(1)
+            if os.getenv('TRACEBACK') == '1' or os.getenv('TRACEBACK') == 1:
+                logger.error(e)
+            #time.sleep(1)
             try:
                 c = MPDClient()
                 c.connect(host, port, timeout)
@@ -1680,6 +1681,7 @@ class Art(QDialog):
 
 def usage(path=None):
     parser = argparse.ArgumentParser('mpdart', epilog = make_colors('MPD Client info + Art', 'ly'))
+    parser.add_argument('-c', '--config', help = 'Prefer use config from file', action = 'store')
     parser.add_argument('-s', '--cover-server', help = 'Run cover server',  action = 'store_true')
     parser.add_argument('-S', '--cover-server-host', help = 'Listen cover server on, default = "0.0.0.0"', action = 'store')
     parser.add_argument('-P', '--cover-server-port', help = 'Listen cover server on port, default = "8800"', action = 'store', type = int)
@@ -1698,6 +1700,10 @@ def usage(path=None):
         #global APP
         
         args = parser.parse_args()
+        
+        if args.config and os.path.isfile(args.config):
+            CONFIG = configset(args.config)
+            CONFIGFILE = args.config
         
         if args.mpd_host: MPD_HOST = args.mpd_host
         if args.mpd_port: MPD_PORT = args.mpd_port        
