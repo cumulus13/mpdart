@@ -1084,14 +1084,32 @@ class Art(QDialog):
         #self.timer.start(int(float(self.total)) * 1000)
         
     def set_bar(self):
+        self.current_state = MPD.conn('status')
+        debug(self_current_state = self.current_state, debug = 1)
+        debug(self_last_song = self.last_song, debug = 1)
+        debug(self_current_song_get_file = self.current_song.get('file'), debug = 1)
+        debug(self_current = self.current, debug = 1)
+        debug(self_total = self.total, debug = 1)
+        debug(duration = self.current_state.get('duration'), debug = 1)
+        debug(elapsed = self.current_state.get('elapsed'), debug = 1)
         if self.current_state:
             #logger.warning("current state: {}".format(self.current_state.get('state')))
             #logger.warning('last state   : {}'.format(self.last_state))
-            if self.current_state.get('state') == 'play' or not self.last_song == self.current_song.get('file'):
-                
-                if not float(self.current) >= float(self.total):
-                    self.ui.pbar.setValue(int((float(self.current) / float(self.total)) * 100))
-                    if not self.last_state == 'play' or not self.last_song == self.current_song.get('file'):
+            debug(self_current_state_get_state = self.current_state.get('state'), debug = 1)
+            try:
+                debug(check_duration = self.current_state.get('duration') > self.current_state.get('elapsed'), debug = 1)
+            except:
+                pass
+            if self.current_state.get('state') == 'play':# or not self.last_song == self.current_song.get('file'):
+                if self.current_state.get('duration') > self.current_state.get('elapsed'):
+                    percent_value = int((float(self.current_state.get('elapsed')) / float(self.current_state.get('duration'))) * 100)
+                    debug(percent_value = percent_value, debug = 1)
+                    self.ui.pbar.setValue(percent_value)
+                    self._showData(self.host, self.port, self.timeout, False)
+                #if not float(self.current) >= float(self.total):
+                    #self.ui.pbar.setValue(int((float(self.current) / float(self.total)) * 100))
+                    #if not self.last_state == 'play' or not self.last_song == self.current_song.get('file'):
+                    if not self.current_state.get('state') == 'play' or not self.last_song == self.current_song.get('file'):
                         logger.warning('{} --> play'.format(self.last_state))
                         try:
                             self.bring_to_front(self.dark_view)
@@ -1190,7 +1208,7 @@ class Art(QDialog):
         #self.jump()        
         self.current_state = MPD.conn('status')
         self.current_song = MPD.conn('currentsong')
-        debug(self_current_state = self.current_state)
+        debug(self_current_state = self.current_state, debug = 1)
         debug(self_current_song = self.current_song)
         
         if not self.current_song.get('file') == self.last_song:
@@ -1281,12 +1299,14 @@ class Art(QDialog):
                 debug(current_song = current_song)
                 MPD.CONN.connect(host, port, timeout)
             except mpd.base.CommandError:
+                print(traceback.format_exc())
                 current_song = {}
         except mpd.base.ConnectionError:
-            current_state = {}        
+            current_state = {}
+        current_song = current_song or self.current_song
         if not self.current_song == current_song and current_song:
             self.cover = ''
-        debug(current_song = current_song)
+        debug(current_song = current_song, debug = 1)
         
         if current_song:
             track = current_song.get('track')
@@ -1486,32 +1506,34 @@ class Art(QDialog):
                 pass
             
     def setOnTop(self):
-        if self.ui.cb_top.isChecked():
-            self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
-            self.bring_to_front(self)
-        else:
-            self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+        if self.CONFIG.get_config('appereance', 'top') == 1:
+            if self.ui.cb_top.isChecked():
+                self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
+                self.bring_to_front(self)
+            else:
+                self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
 
     def bring_to_front(self, window = None):
-        if not window:
-            return False
-        if sys.platform == 'win32':
-            from win32gui import SetWindowPos
-            import win32con
-            SetWindowPos(window.winId(),
-                          win32con.HWND_TOPMOST, # = always on top. only reliable way to bring it to the front on windows
-                          0, 0, 0, 0,
-                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW)
-            SetWindowPos(window.winId(),
-                         win32con.HWND_NOTOPMOST, # disable the always on top, but leave window at its top position
-                         0, 0, 0, 0,
-                         win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW)
-
-        # else:
-            # window.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint | Qt.WindowStayOnTopHint)
-        window.raise_()
-        window.show()
-        window.activateWindow()
+        if self.CONFIG.get_config('appereance', 'top') == 1:
+            if not window:
+                return False
+            if sys.platform == 'win32':
+                from win32gui import SetWindowPos
+                import win32con
+                SetWindowPos(window.winId(),
+                              win32con.HWND_TOPMOST, # = always on top. only reliable way to bring it to the front on windows
+                              0, 0, 0, 0,
+                              win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW)
+                SetWindowPos(window.winId(),
+                             win32con.HWND_NOTOPMOST, # disable the always on top, but leave window at its top position
+                             0, 0, 0, 0,
+                             win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW)
+    
+            # else:
+                # window.setWindowFlags(Qt.Window | Qt.CustomizeWindowHint | Qt.WindowStayOnTopHint)
+            window.raise_()
+            window.show()
+            window.activateWindow()
     
     def setPixmap(self, image):
         pix = QPixmap(image)
