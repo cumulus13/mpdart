@@ -5,7 +5,7 @@
 
 from __future__ import print_function
 
-from netifaces import interfaces, ifaddresses, AF_INET
+#from netifaces import interfaces, ifaddresses, AF_INET
 from make_colors import make_colors
 from pydebugger.debug import debug
 from multiprocessing import Pool
@@ -22,8 +22,13 @@ import time
 #import base64
 import http.server as SimpleHTTPServer
 import socketserver as SocketServer
-from mutagen.id3 import ID3
-from mutagen.flac import FLAC
+try:
+    from mutagen.id3 import ID3
+    from mutagen.flac import FLAC
+    MUTAGEN = True
+except ImportError:
+    MUTAGEN = False
+    
 import requests
 from datetime import datetime, timedelta
 if sys.version_info.major == 3:
@@ -362,9 +367,12 @@ class MPD(object):
                     break
             if data_cover: debug(len_data_cover = len(data_cover.data))
         elif music_file.lower().endswith('.flac'):
-            f = FLAC(music_file)
-            if f.picture:
-                data_cover = f.picture[0]
+            if MUTAGEN:
+                f = FLAC(music_file)
+                if f.picture:
+                    data_cover = f.picture[0]
+            else:
+                print('"mutagen" module is not installed !')
         if not data_cover:
             if not self.first:
                 logger.warn(make_colors("Music file don't containt tag Cover !", 'lw', 'r'))
@@ -721,11 +729,14 @@ class MPD(object):
             cover_file = os.path.join(music_dir, sep.join(current_song.get('file').split("/")[1:]))
             debug(cover_file = cover_file)
             try:
-                self.cover = MPD.get_cover_tag(cover_file)
-                if MPD.check_is_image(cover_file):
-                    logger.warning("get cover by name [.jpg|.png], cover is file [4]")
-                    logger.debug("self.cover: {}".format(self.cover))
-                    return self.cover                        
+                if MUTAGEN:
+                    self.cover = MPD.get_cover_tag(cover_file)
+                    if MPD.check_is_image(cover_file):
+                        logger.warning("get cover by name [.jpg|.png], cover is file [4]")
+                        logger.debug("self.cover: {}".format(self.cover))
+                        return self.cover
+                else:
+                    print('"mutagen" module is not installed !')                
             except:
                 pass
         #if MPD.check_is_image(self.cover):
@@ -909,6 +920,8 @@ class Art(QDialog):
     last_song = ''
     current = 1
     total = 1
+    host = '127.0.0.1'
+    port = 6600
     
     PREFIX = '{variables.task} >> {variables.subtask} '
     VARIABLES = {'task': '--', 'subtask': '--',}
@@ -1025,7 +1038,7 @@ class Art(QDialog):
         logger.warning("config jump: {}".format(jump))
         jump_from = ''
         jump_to = ''
-        if jump and "," in  jump:
+        if jump and "," in jump:
             try:
                 jump_from, jump_to = list(filter(None, [i.strip() for i in re.split(",|\n", jump)]))
                 if jump_from == '.' or jump_from == "#" or jump_from == "?":
@@ -1088,7 +1101,7 @@ class Art(QDialog):
             #logger.warning("current state: {}".format(self.current_state.get('state')))
             #logger.warning('last state   : {}'.format(self.last_state))
             if self.current_state.get('state') == 'play' or not self.last_song == self.current_song.get('file'):
-                
+                self.jump()
                 if not float(self.current) >= float(self.total):
                     self.ui.pbar.setValue(int((float(self.current) / float(self.total)) * 100))
                     if not self.last_state == 'play' or not self.last_song == self.current_song.get('file'):
@@ -1142,6 +1155,7 @@ class Art(QDialog):
                 self.ui.pbar.setValue(int((float(self.current) / float(self.total)) * 100))
                 #self._showData(self.host, self.port, self.timeout, True)
             elif self.current_state.get('state') == 'stop' or not self.last_song == self.current_song.get('file'):
+                self.jump()
                 if not self.last_state == "stop":
                     logger.warning('{} --> stop'.format(self.last_state))
                     try:
@@ -1170,6 +1184,7 @@ class Art(QDialog):
                 self.last_song = self.current_song.get('file')
                 self.last_state = self.current_state.get('state')
             else:
+                self.jump()
                 if not self.last_state == self.current_state.get('state') or not self.last_song == self.current_song.get('file'):
                     logger.warning('{} --> {}'.format(self.last_state, self.current_state.get('state')))
                     try:
@@ -1693,6 +1708,38 @@ def usage(path=None):
     parser.add_argument('-r', '--repeat-to', help = 'Repeat to number or jump after song to track playlist number, format: N1,N2 , N1 = from N2 to, if song get N1 then song will jump to N2, if N1 = ?|#|. N1 will set as curret number/pos, "c" for N1/N2 clear repeat/jump', action = 'store', nargs = 2)
     if len(sys.argv) == 1 and not path:
         parser.print_help()
+        
+        MPD_HOST = MPD.host
+        MPD_PORT = MPD.port
+        
+        app = QApplication(sys.argv)
+        View = Art()
+        
+        #apply_stylesheet(app, theme = 'dark_yellow.xml', invert_secondary = False)
+        qtmodern.styles.dark(app)
+        #app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
+        View.dark_view = qtmodern.windows.ModernWindow(View)
+        View.dark_view.setMaximumSize(View.maximumSize())
+        View.dark_view.setMaximumHeight(View.maximumHeight())
+        View.dark_view.setMaximumWidth(View.maximumWidth())
+        View.dark_view.setFixedSize(View.maximumWidth() + 2, View.maximumHeight() + 31)
+        try:
+            View.installEventFilter(View.dark_view)
+        except:
+            pass
+        if MPD.CONFIG.get_config('title', 'bar'):
+            try:
+                View.dark_view.setWindowFlag(Qt.FramelessWindowHint)
+            except:
+                #print(traceback.format_exc())
+                logger.error(traceback.format_exc())
+        #self.dark_view.setWindowTitle()
+        logger.warning('showing ....')
+        View.dark_view.show()
+        View.show()
+        View.showData()
+        app.exec_()
+        
     else:
         #global MPD_HOST
         #global MPD_PORT
