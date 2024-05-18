@@ -1,3 +1,4 @@
+pyqt5
 pydebugger
 make_colors
 netifaces
@@ -11,5 +12,5 @@ qtmodern
 qt_material
 xnotify
 python-mpd2
-mimelist
 bitmath
+git+https://github.com/cumulus13/mimelist

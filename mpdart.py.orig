@@ -1108,6 +1108,13 @@ class Art(QDialog):
         if self.current_state:
             #logger.warning("current state: {}".format(self.current_state.get('state')))
             #logger.warning('last state   : {}'.format(self.last_state))
+<<<<<<< HEAD
+            if self.current_state.get('state') == 'play' or not self.last_song == self.current_song.get('file'):
+                self.jump()
+                if not float(self.current) >= float(self.total):
+                    self.ui.pbar.setValue(int((float(self.current) / float(self.total)) * 100))
+                    if not self.last_state == 'play' or not self.last_song == self.current_song.get('file'):
+=======
             debug(self_current_state_get_state = self.current_state.get('state'), debug = 1)
             try:
                 debug(check_duration = self.current_state.get('duration') > self.current_state.get('elapsed'), debug = 1)
@@ -1123,6 +1130,7 @@ class Art(QDialog):
                     #self.ui.pbar.setValue(int((float(self.current) / float(self.total)) * 100))
                     #if not self.last_state == 'play' or not self.last_song == self.current_song.get('file'):
                     if not self.current_state.get('state') == 'play' or not self.last_song == self.current_song.get('file'):
+>>>>>>> 412b401ad3b8b053ed8c3a80df4f681dd5115f56
                         logger.warning('{} --> play'.format(self.last_state))
                         try:
                             self.bring_to_front(self.dark_view)
@@ -1223,7 +1231,7 @@ class Art(QDialog):
         #self.jump()        
         self.current_state = MPD.conn('status')
         self.current_song = MPD.conn('currentsong')
-        debug(self_current_state = self.current_state)
+        debug(self_current_state = self.current_state, debug = 1)
         debug(self_current_song = self.current_song)
         
         if not self.current_song.get('file') == self.last_song:
@@ -1321,7 +1329,7 @@ class Art(QDialog):
         current_song = current_song or self.current_song
         if not self.current_song == current_song and current_song:
             self.cover = ''
-        debug(current_song = current_song)
+        debug(current_song = current_song, debug = 1)
         
         if current_song:
             track = current_song.get('track')
