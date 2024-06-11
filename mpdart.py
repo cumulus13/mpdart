@@ -1098,25 +1098,25 @@ class Art(QDialog):
         
     def set_bar(self):
         self.current_state = MPD.conn('status')
-        debug(self_current_state = self.current_state, debug = 1)
-        debug(self_last_song = self.last_song, debug = 1)
-        debug(self_current_song_get_file = self.current_song.get('file'), debug = 1)
-        debug(self_current = self.current, debug = 1)
-        debug(self_total = self.total, debug = 1)
-        debug(duration = self.current_state.get('duration'), debug = 1)
-        debug(elapsed = self.current_state.get('elapsed'), debug = 1)
+        debug(self_current_state = self.current_state)
+        debug(self_last_song = self.last_song)
+        debug(self_current_song_get_file = self.current_song.get('file'))
+        debug(self_current = self.current)
+        debug(self_total = self.total)
+        debug(duration = self.current_state.get('duration'))
+        debug(elapsed = self.current_state.get('elapsed'))
         if self.current_state:
             #logger.warning("current state: {}".format(self.current_state.get('state')))
             #logger.warning('last state   : {}'.format(self.last_state))
-            debug(self_current_state_get_state = self.current_state.get('state'), debug = 1)
+            debug(self_current_state_get_state = self.current_state.get('state'))
             try:
-                debug(check_duration = self.current_state.get('duration') > self.current_state.get('elapsed'), debug = 1)
+                debug(check_duration = self.current_state.get('duration') > self.current_state.get('elapsed'))
             except:
                 pass
             if self.current_state.get('state') == 'play':# or not self.last_song == self.current_song.get('file'):
                 if self.current_state.get('duration') > self.current_state.get('elapsed'):
                     percent_value = int((float(self.current_state.get('elapsed')) / float(self.current_state.get('duration'))) * 100)
-                    debug(percent_value = percent_value, debug = 1)
+                    debug(percent_value = percent_value)
                     self.ui.pbar.setValue(percent_value)
                     self._showData(self.host, self.port, self.timeout, False)
                 #if not float(self.current) >= float(self.total):
@@ -1268,11 +1268,11 @@ class Art(QDialog):
         task = make_colors("re-connecting to MPD_HOST -> {}".format((host or os.getenv('MPD_HOST'))), 'b', 'y')
         self.BAR.max_value = MAX_TRY
         current_state = current_state or MPD.conn('status')
-        debug(current_state = current_state, debug = 1)
+        debug(current_state = current_state)
         while 1:
             try:
                 current_state = current_state or MPD.conn('status')
-                debug(current_state = current_state, debug = 1)
+                debug(current_state = current_state)
                 break
             except:# ConnectionError:
                 try:
@@ -1291,8 +1291,8 @@ class Art(QDialog):
                         time.sleep(1)
             #except mpd.base.ConnectionError:
                 #subtask = make_colors("mpd.base.ConnectionError [2]", 'lw', 'r')
-                # #debug(nt = nt, debug = 1)
-                # #debug(MAX_TRY = MAX_TRY, debug = 1)
+                # #debug(nt = nt)
+                # #debug(MAX_TRY = MAX_TRY)
                 #if nt == MAX_TRY:
                     #current_state = {}
                     #break
